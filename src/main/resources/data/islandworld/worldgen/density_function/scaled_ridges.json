@@ -1,0 +1,5 @@
+{
+  "type": "islandworld:scaled_climate",
+  "wrapped": "minecraft:overworld/ridges",
+  "scale": 4.0
+}

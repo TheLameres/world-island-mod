@@ -1,0 +1,5 @@
+{
+  "type": "islandworld:north_south_temperature",
+  "cold_z": -1000.0,
+  "hot_z": 1000.0
+}
