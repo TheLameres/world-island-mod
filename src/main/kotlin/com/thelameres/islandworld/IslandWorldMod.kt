@@ -30,6 +30,8 @@ object IslandWorldMod : ModInitializer {
 
     override fun onInitialize() {
         ModDensityFunctions.register()
+        // Стронгхолды только в океане (план, раздел 3.1)
+        com.thelameres.islandworld.worldgen.structure.OceanConcentricRingsPlacement.register()
 
 		// Чёрная комната (план, раздел 5)
 		com.thelameres.islandworld.worldgen.blackroom.BlackRoomChunkGenerator.register()

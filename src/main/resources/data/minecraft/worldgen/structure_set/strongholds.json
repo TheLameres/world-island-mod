@@ -1,0 +1,18 @@
+{
+  "placement": {
+    "type": "islandworld:ocean_concentric_rings",
+    "count": 128,
+    "distance": 32,
+    "preferred_biomes": "#minecraft:is_ocean",
+    "salt": 0,
+    "spread": 3,
+    "island_radius": 800,
+    "max_radius": 1900
+  },
+  "structures": [
+    {
+      "structure": "minecraft:stronghold",
+      "weight": 1
+    }
+  ]
+}
