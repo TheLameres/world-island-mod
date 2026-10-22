@@ -1,3 +1,5 @@
 {
-  "generator.islandworld.island": "Островной мир"
+  "generator.islandworld.island": "Островной мир",
+  "death.attack.islandworld.unknown": "%s был уничтожен незримой сущностью",
+  "islandworld.subtitle.unknown_death": "Незримая сущность"
 }

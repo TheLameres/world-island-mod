@@ -1,19 +1,21 @@
 # Уточнённый план мода «Island World» для Minecraft 26.3 и Fabric 0.164.0+26.3
 
-Учтены все уточнения: спавн на юго-западе, клиентский мод, чёрная комната с порталом и телепортацией, температура по оси север-юг.
+Учтены все уточнения: спавн на юго-западе, клиентский мод, чёрная комната с порталом и телепортацией, температура по оси
+север-юг.
 
 ---
 
 ## 0. Ключевые решения после уточнений
 
-1. **Граница:** расстояние от (0, 0) по формуле Евклида. Предупреждения на 1800, 1900 и 1950 блоках, смерть на 2000 через урон `islandworld:unknown` (без сущности). Текст стадий в обычной игре не выводится.
+1. **Граница:** расстояние от (0, 0) по формуле Евклида. Предупреждения на 1800, 1900 и 1950 блоках, смерть на 2000
+   через урон `islandworld:unknown` (без сущности). Текст стадий в обычной игре не выводится.
 2. **Спавн:** юго-западный край острова, примерно (−600, ~, −600).
 3. **Клиентский мод:** собственный рендерер сущности, пост-эффекты (shader), звуки, payload'ы для галлюцинаций.
 4. **Чёрная комната:**
-   - Размер 9×9 чанков (144×144 блока) с центром в (0, 64, 0).
-   - Пол из барьеров (неразрушимый прозрачный блок).
-   - Портал Нижнего мира в центре для выхода.
-   - Телепортация при пересечении границы чанков: север↔юг, запад↔восток (wrap-around).
+    - Размер 9×9 чанков (144×144 блока) с центром в (0, 64, 0).
+    - Пол из барьеров (неразрушимый прозрачный блок).
+    - Портал Нижнего мира в центре для выхода.
+    - Телепортация при пересечении границы чанков: север↔юг, запад↔восток (wrap-around).
 5. **Температурная карта:** линейный градиент север→юг (холодный→жаркий) вместо ванильного 2D-шума.
 
 ---
@@ -105,6 +107,7 @@ islandworld/
 ### 2.1. World Preset и Noise Settings
 
 **`data/islandworld/worldgen/world_preset/island.json`:**
+
 ```json
 {
   "dimensions": {
@@ -118,8 +121,12 @@ islandworld/
         "settings": "islandworld:island"
       }
     },
-    "minecraft:the_nether": { "..." },
-    "minecraft:the_end": { "..." }
+    "minecraft:the_nether": {
+      "..."
+    },
+    "minecraft:the_end": {
+      "..."
+    }
   }
 }
 ```
@@ -143,18 +150,18 @@ public class IslandMaskDensityFunction implements DensityFunction {
     public double compute(FunctionContext ctx) {
         double x = ctx.blockX();
         double z = ctx.blockZ();
-        
+
         // Искажение границы 2D-шумом
         double noiseOffset = noise2d.compute(ctx) * noiseAmplitude;
         double distortedRadius = islandRadius + noiseOffset;
-        
+
         double distance = Math.sqrt(x * x + z * z);
-        
+
         // Smooth falloff от центра к краю
         double normalized = (distance - distortedRadius) / edgeSoftness;
         return 1.0 - smoothstep(normalized); // 1 внутри, 0 снаружи
     }
-    
+
     private double smoothstep(double x) {
         x = Math.max(0, Math.min(1, x));
         return x * x * (3.0 - 2.0 * x);
@@ -165,6 +172,7 @@ public class IslandMaskDensityFunction implements DensityFunction {
 Регистрация через `DensityFunctions.CODEC` и JSON:
 
 **`data/islandworld/worldgen/density_function/island_mask.json`:**
+
 ```json
 {
   "type": "islandworld:island_mask",
@@ -187,15 +195,15 @@ public class IslandMaskDensityFunction implements DensityFunction {
 public class NorthSouthTemperatureDensityFunction implements DensityFunction {
     private final double coldZ = -750.0; // северный край
     private final double hotZ = 750.0;   // южный край
-    
+
     @Override
     public double compute(FunctionContext ctx) {
         double z = ctx.blockZ();
-        
+
         // Линейная интерполяция: север (−1) → юг (+1)
         double t = (z - coldZ) / (hotZ - coldZ);
         t = Math.max(0, Math.min(1, t));
-        
+
         // Маппинг в диапазон температуры биомов (−1…+1)
         return t * 2.0 - 1.0; // −1 (холодно) до +1 (жарко)
     }
@@ -203,6 +211,7 @@ public class NorthSouthTemperatureDensityFunction implements DensityFunction {
 ```
 
 **`data/islandworld/worldgen/density_function/north_south_temperature.json`:**
+
 ```json
 {
   "type": "islandworld:north_south_temperature"
@@ -215,13 +224,14 @@ public class NorthSouthTemperatureDensityFunction implements DensityFunction {
 
 ### 2.4. Сжатие климата
 
-**`ScaledClimateDensityFunction`** масштабирует координаты XZ перед вычислением `vegetation`, `erosion`, `ridges` в 3–5 раз, чтобы уместить разнообразие биомов на острове.
+**`ScaledClimateDensityFunction`** масштабирует координаты XZ перед вычислением `vegetation`, `erosion`, `ridges` в 3–5
+раз, чтобы уместить разнообразие биомов на острове.
 
 ```java
 public class ScaledClimateDensityFunction implements DensityFunction {
     private final DensityFunction wrapped;
     private final double scale = 4.0;
-    
+
     @Override
     public double compute(FunctionContext ctx) {
         // Масштабируем координаты
@@ -239,10 +249,13 @@ public class ScaledClimateDensityFunction implements DensityFunction {
 
 В `noise_settings/island.json` измените:
 
-- **`continents`:** `blend(islandworld:island_mask, vanilla_continents, deep_ocean_value)` — внутри острова суша, снаружи океан.
-- **`final_density`:** умножьте на маску, чтобы за пределами острова Y-плотность всегда была отрицательной (пустота или глубокое дно).
+- **`continents`:** `blend(islandworld:island_mask, vanilla_continents, deep_ocean_value)` — внутри острова суша,
+  снаружи океан.
+- **`final_density`:** умножьте на маску, чтобы за пределами острова Y-плотность всегда была отрицательной (пустота или
+  глубокое дно).
 
 Пример (упрощённо):
+
 ```json
 {
   "noise_router": {
@@ -274,6 +287,7 @@ public class ScaledClimateDensityFunction implements DensityFunction {
 5. Оставшиеся биомы заполняются климатической сеткой (температура × vegetation × continentalness).
 
 Команда **`/island biomes report`** сэмплирует сетку 50×50 и выводит:
+
 - список найденных биомов;
 - список отсутствующих биомов из тега `#islandworld:required_biomes`;
 - рекомендации (увеличить масштаб, добавить регионы).
@@ -288,10 +302,10 @@ public class ScaledClimateDensityFunction implements DensityFunction {
 public static void setIslandSpawn(ServerLevel level) {
     // Цель: юго-запад острова, примерно (−600, ~, −600)
     BlockPos target = new BlockPos(-600, 64, -600);
-    
+
     // Поиск безопасной позиции (суша, не в воде)
     BlockPos spawn = findSafeLandSpawn(level, target, 100);
-    
+
     level.setDefaultSpawnPos(spawn, 0.0f);
 }
 
@@ -301,9 +315,9 @@ private static BlockPos findSafeLandSpawn(ServerLevel level, BlockPos center, in
             BlockPos pos = center.offset(dx, 0, dz);
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ());
             BlockPos candidate = new BlockPos(pos.getX(), y, pos.getZ());
-            
+
             if (level.getBlockState(candidate.below()).isSolid() &&
-                !level.getFluidState(candidate).isEmpty() == false) {
+                    !level.getFluidState(candidate).isEmpty() == false) {
                 return candidate;
             }
         }
@@ -347,26 +361,26 @@ private static BlockPos findSafeLandSpawn(ServerLevel level, BlockPos center, in
 public class OceanConcentricRingsPlacement extends StructurePlacement {
     private final int islandRadius;
     private final int maxRadius;
-    
+
     @Override
     protected Optional<GenerationStub> getPlacementAt(GenerationContext ctx) {
         ChunkPos chunkPos = ctx.chunkPos();
         double distance = Math.sqrt(chunkPos.x * chunkPos.x + chunkPos.z * chunkPos.z) * 16.0;
-        
+
         // Пропускаем позиции внутри острова и за границей
         if (distance < islandRadius || distance > maxRadius) {
             return Optional.empty();
         }
-        
+
         // Проверяем, что биом океанический
         Holder<Biome> biome = ctx.biomeSource().getNoiseBiome(
-            chunkPos.x << 2, 63, chunkPos.z << 2, ctx.randomState().sampler()
+                chunkPos.x << 2, 63, chunkPos.z << 2, ctx.randomState().sampler()
         );
-        
+
         if (!biome.is(BiomeTags.IS_OCEAN)) {
             return Optional.empty();
         }
-        
+
         return super.getPlacementAt(ctx);
     }
 }
@@ -379,19 +393,20 @@ public class OceanConcentricRingsPlacement extends StructurePlacement {
 **`PortalBlocker`** (миксин на `EndPortalFrameBlock` или событие `UseBlockCallback`):
 
 ```java
+
 @Mixin(EndPortalFrameBlock.class)
 public class MixinEndPortalFrame {
     @Inject(method = "use", at = @At("HEAD"), cancellable = true)
-    private void onUseFrame(BlockState state, Level level, BlockPos pos, 
-                            Player player, InteractionHand hand, 
+    private void onUseFrame(BlockState state, Level level, BlockPos pos,
+                            Player player, InteractionHand hand,
                             BlockHitResult hit, CallbackInfoReturnable<InteractionResult> cir) {
         double distance = Math.sqrt(pos.getX() * pos.getX() + pos.getZ() * pos.getZ());
-        
+
         if (distance < 800) {
             if (!level.isClientSide) {
                 player.displayClientMessage(
-                    Component.translatable("islandworld.portal.blocked"), 
-                    true
+                        Component.translatable("islandworld.portal.blocked"),
+                        true
                 );
             }
             cir.setReturnValue(InteractionResult.FAIL);
@@ -410,7 +425,9 @@ public class MixinEndPortalFrame {
 
 ## 4. Этап 3. Граница 2000 блоков с галлюцинациями и смертью
 
-> Обновлено после уточнений: три предупреждения (1800 / 1900 / 1950), смерть на 2000 через кастомный тип урона без спавна сущности. Сообщения о стадиях в обычной игре не выводятся, эффект виден на экране. Текст стадий включается флагом `debug_messages` только для тестов. Сущность `UnknownEntity` из этого раздела удалена.
+> Обновлено после уточнений: три предупреждения (1800 / 1900 / 1950), смерть на 2000 через кастомный тип урона без
+> спавна сущности. Сообщения о стадиях в обычной игре не выводятся, эффект виден на экране. Текст стадий включается флагом
+> `debug_messages` только для тестов. Сущность `UnknownEntity` из этого раздела удалена.
 
 ### 4.1. Конфиг
 
@@ -436,21 +453,40 @@ public class MixinEndPortalFrame {
   },
   "hallucinations": {
     "stage1": {
-      "effects": ["darkness:1", "nausea:1"],
-      "sounds": ["islandworld:whisper"],
+      "effects": [
+        "darkness:1",
+        "nausea:1"
+      ],
+      "sounds": [
+        "islandworld:whisper"
+      ],
       "fake_entities": 1,
       "post_effect": "vignette_light"
     },
     "stage2": {
-      "effects": ["darkness:2", "nausea:2", "slowness:1"],
-      "sounds": ["islandworld:scream", "islandworld:heartbeat"],
+      "effects": [
+        "darkness:2",
+        "nausea:2",
+        "slowness:1"
+      ],
+      "sounds": [
+        "islandworld:scream",
+        "islandworld:heartbeat"
+      ],
       "fake_entities": 2,
       "post_effect": "distortion_light",
       "screen_shake": true
     },
     "stage3": {
-      "effects": ["darkness:2", "nausea:3", "slowness:2"],
-      "sounds": ["islandworld:heartbeat", "islandworld:distant_steps"],
+      "effects": [
+        "darkness:2",
+        "nausea:3",
+        "slowness:2"
+      ],
+      "sounds": [
+        "islandworld:heartbeat",
+        "islandworld:distant_steps"
+      ],
       "fake_entities": 3,
       "post_effect": "distortion_heavy",
       "screen_shake": true
@@ -460,6 +496,7 @@ public class MixinEndPortalFrame {
 ```
 
 Пояснения:
+
 - `kill_delay_ticks` — 160 тиков (8 секунд), задержка за границей 2000 после третьего предупреждения.
 - `reset_radius_margin` — при возврате ниже `warn1_radius − 100` (1700) счётчик предупреждений обнуляется.
 - `death_sound` — звук `distant_sound` получают все игроки сервера, кроме жертвы. Ограничения по радиусу нет.
@@ -469,7 +506,8 @@ public class MixinEndPortalFrame {
 
 ### 4.2. BoundaryManager
 
-Состояние хранится на игроке в `PlayerBoundaryState`: количество выданных предупреждений (0–3) и накопленное время за границей. Enum стадий не нужен, стадия — это `warningsIssued`.
+Состояние хранится на игроке в `PlayerBoundaryState`: количество выданных предупреждений (0–3) и накопленное время за
+границей. Enum стадий не нужен, стадия — это `warningsIssued`.
 
 **`border/BoundaryManager.kt`:**
 
@@ -526,8 +564,12 @@ object BoundaryManager {
     private fun isProtected(player: ServerPlayer): Boolean =
         player.isCreative || player.isSpectator
 
-    fun onDisconnect(uuid: UUID) { states.remove(uuid) }
-    fun onRespawn(uuid: UUID) { states.remove(uuid) }
+    fun onDisconnect(uuid: UUID) {
+        states.remove(uuid)
+    }
+    fun onRespawn(uuid: UUID) {
+        states.remove(uuid)
+    }
 }
 
 class PlayerBoundaryState {
@@ -536,7 +578,8 @@ class PlayerBoundaryState {
 }
 ```
 
-Регистрация в `IslandWorldMod.kt`: `ServerTickEvents.END_SERVER_TICK`, `ServerPlayConnectionEvents.DISCONNECT`, `ServerPlayerEvents.AFTER_RESPAWN`.
+Регистрация в `IslandWorldMod.kt`: `ServerTickEvents.END_SERVER_TICK`, `ServerPlayConnectionEvents.DISCONNECT`,
+`ServerPlayerEvents.AFTER_RESPAWN`.
 
 ---
 
@@ -558,10 +601,13 @@ object Warnings {
 ```
 
 **`border/HallucinationEffect.kt`** (серверная часть):
+
 - Применяет эффекты из `hallucinations.stageN.effects` (`darkness`, `nausea`, `slowness`).
 - Проигрывает звуки из `sounds` (только у этого игрока, через `ClientboundSoundPacket`).
 - Отправляет `HallucinationPayload(stage)` клиенту для шейдеров и виньетки.
-- Фейковые сущности (зомби за спиной) спавнятся через `ClientboundAddEntityPacket` с **сохранённым ID**. Удаляются точным `ClientboundRemoveEntitiesPacket(id)` через 3 секунды. Хак с фиксированным ID `-9999` из старой версии не используется.
+- Фейковые сущности (зомби за спиной) спавнятся через `ClientboundAddEntityPacket` с **сохранённым ID**. Удаляются
+  точным `ClientboundRemoveEntitiesPacket(id)` через 3 секунды. Хак с фиксированным ID `-9999` из старой версии не
+  используется.
 
 **`network/payload/HallucinationPayload.kt`:**
 
@@ -570,6 +616,7 @@ data class HallucinationPayload(val stage: Int) : CustomPayload {
     companion object {
         val ID = CustomPayload.Id<HallucinationPayload>(IslandWorldIds.id("hallucination"))
     }
+
     override fun id() = ID
 }
 ```
@@ -581,31 +628,43 @@ data class HallucinationPayload(val stage: Int) : CustomPayload {
 ### 4.4. Клиент: шейдеры, виньетка, звуки
 
 **`IslandWorldClient.kt`:**
+
 - Принимает `HallucinationPayload` и вызывает `HallucinationOverlay.apply(stage)`.
 - Регистрация `UnknownEntityRenderer` **удалена**.
 
 **`HallucinationOverlay`:**
+
 - `stage 1`: виньетка (`vignette.json`).
 - `stage 2`: лёгкое искажение (`distortion.json`, интенсивность 0.05) и встряхивание камеры.
 - `stage 3`: сильное искажение (интенсивность 0.12), усиленная виньетка, тряска.
 
 Тряска камеры — только клиентская. Серверный `setXRot` из старой версии убран.
 
-Файлы: `shaders/post/distortion.json`, `shaders/post/vignette.json`, `sounds.json` для `islandworld:whisper`, `scream`, `heartbeat`, `distant_steps`, `unknown_death`, `unknown_death_distant`.
+Файлы: `shaders/post/distortion.json`, `shaders/post/vignette.json`, `sounds.json` для `islandworld:whisper`, `scream`,
+`heartbeat`, `distant_steps`, `unknown_death`, `unknown_death_distant`.
 
 ---
 
 ### 4.5. Смерть от незримой сущности и звуки смерти
 
-Сущности нет. Игрок умирает от кастомного типа урона `islandworld:unknown`, поэтому ванильная система смертей сама подставляет имя игрока в текст.
+Сущности нет. Игрок умирает от кастомного типа урона `islandworld:unknown`, поэтому ванильная система смертей сама
+подставляет имя игрока в текст.
 
-**Творческий режим и наблюдатель.** Игроки в творческом режиме (`player.isCreative`) и в режиме наблюдателя (`player.isSpectator`) этот урон не получают. Проверка `isProtected()` стоит в `BoundaryManager` перед вызовом `UnknownDeath.kill()`, поэтому для них не выполняется ни урон, ни звуки смерти. Предупреждения и галлюцинации у них остаются, потому что они не связаны со смертью. Если игрок переключился в творческий режим уже после смерти по таймеру, таймер сбрасывается, потому что условие не выполняется.
+**Творческий режим и наблюдатель.** Игроки в творческом режиме (`player.isCreative`) и в режиме наблюдателя
+(`player.isSpectator`) этот урон не получают. Проверка `isProtected()` стоит в `BoundaryManager` перед вызовом
+`UnknownDeath.kill()`, поэтому для них не выполняется ни урон, ни звуки смерти. Предупреждения и галлюцинации у них
+остаются, потому что они не связаны со смертью. Если игрок переключился в творческий режим уже после смерти по таймеру,
+таймер сбрасывается, потому что условие не выполняется.
 
 Во время смерти звучат два кастомных звука:
-- `islandworld:unknown_death` — слышит только жертва. Отправляется в её соединение, без позиции, громкость 1.0.
-- `islandworld:unknown_death_distant` — слышат **все остальные игроки сервера**, независимо от расстояния. Звук позиционный, в точке смерти. Чтобы он был слышен на любом расстоянии в пределах мира, затухание задано большим (`attenuation_distance: 4000`, см. `sounds.json`). Жертва в этот список не входит, чтобы она не слышала два звука.
 
-Порядок в `kill()`: сначала звук жертве, затем звук всем остальным игрокам, и только потом урон. Так звуки успевают уйти до экрана смерти.
+- `islandworld:unknown_death` — слышит только жертва. Отправляется в её соединение, без позиции, громкость 1.0.
+- `islandworld:unknown_death_distant` — слышат **все остальные игроки сервера**, независимо от расстояния. Звук
+  позиционный, в точке смерти. Чтобы он был слышен на любом расстоянии в пределах мира, затухание задано большим
+  (`attenuation_distance: 4000`, см. `sounds.json`). Жертва в этот список не входит, чтобы она не слышала два звука.
+
+Порядок в `kill()`: сначала звук жертве, затем звук всем остальным игрокам, и только потом урон. Так звуки успевают уйти
+до экрана смерти.
 
 **`border/UnknownDeath.kt`:**
 
@@ -625,16 +684,20 @@ object UnknownDeath {
 
         // 1. Жертва: звук только ей, без позиции
         player.connection.send(
-            ClientboundSoundPacket(VICTIM_SOUND, SoundSource.MASTER,
-                player.x, player.y, player.z, 1.0f, 1.0f, seed)
+            ClientboundSoundPacket(
+                VICTIM_SOUND, SoundSource.MASTER,
+                player.x, player.y, player.z, 1.0f, 1.0f, seed
+            )
         )
 
         // 2. Все остальные игроки сервера: позиционный звук в точке смерти, без ограничения радиусом
         for (other in player.server.playerList.players) {
             if (other === player) continue
             other.connection.send(
-                ClientboundSoundPacket(DISTANT_SOUND, SoundSource.HOSTILE,
-                    player.x, player.y, player.z, 1.0f, 1.0f, seed)
+                ClientboundSoundPacket(
+                    DISTANT_SOUND, SoundSource.HOSTILE,
+                    player.x, player.y, player.z, 1.0f, 1.0f, seed
+                )
             )
         }
 
@@ -644,7 +707,8 @@ object UnknownDeath {
 }
 ```
 
-Конфиг `death_sound` читается в data class `DeathSoundConfig(victimSound, distantSound)` и кладётся в `BoundaryConfig.deathSound`.
+Конфиг `death_sound` читается в data class `DeathSoundConfig(victimSound, distantSound)` и кладётся в
+`BoundaryConfig.deathSound`.
 
 **`assets/islandworld/sounds.json`:**
 
@@ -652,20 +716,30 @@ object UnknownDeath {
 {
   "unknown_death": {
     "subtitle": "islandworld.subtitle.unknown_death",
-    "sounds": [{ "name": "islandworld:unknown_death", "stream": false }]
+    "sounds": [
+      {
+        "name": "islandworld:unknown_death",
+        "stream": false
+      }
+    ]
   },
   "unknown_death_distant": {
     "subtitle": "islandworld.subtitle.unknown_death",
-    "sounds": [{
-      "name": "islandworld:unknown_death_distant",
-      "stream": false,
-      "attenuation_distance": 4000
-    }]
+    "sounds": [
+      {
+        "name": "islandworld:unknown_death_distant",
+        "stream": false,
+        "attenuation_distance": 4000
+      }
+    ]
   }
 }
 ```
 
-`attenuation_distance: 4000` держит звук слышимым по всей области границы (диаметр 4000 блоков). Громкость на больших расстояниях всё равно ниже, поэтому далёкие игроки слышат его тише. Субтитры для глухих можно не добавлять, тогда ключ `subtitle` убрать. Файлы `.ogg` (`unknown_death.ogg`, `unknown_death_distant.ogg`) в `assets/islandworld/sounds/` нужно подготовить заранее. Без них клиент покажет ошибку загрузки звука.
+`attenuation_distance: 4000` держит звук слышимым по всей области границы (диаметр 4000 блоков). Громкость на больших
+расстояниях всё равно ниже, поэтому далёкие игроки слышат его тише. Субтитры для глухих можно не добавлять, тогда ключ
+`subtitle` убрать. Файлы `.ogg` (`unknown_death.ogg`, `unknown_death_distant.ogg`) в `assets/islandworld/sounds/` нужно
+подготовить заранее. Без них клиент покажет ошибку загрузки звука.
 
 **`data/islandworld/damage_type/unknown.json`:**
 
@@ -677,29 +751,36 @@ object UnknownDeath {
 }
 ```
 
-**`data/minecraft/tags/damage_type/bypasses_invulnerability.json`** — тотем и бессмертие не спасают. Имя тега проверить в 26.3.
+**`data/minecraft/tags/damage_type/bypasses_invulnerability.json`** — тотем и бессмертие не спасают. Имя тега проверить
+в 26.3.
 
 ```json
 {
   "replace": false,
-  "values": ["islandworld:unknown"]
+  "values": [
+    "islandworld:unknown"
+  ]
 }
 ```
 
 **Локализация:**
 
-| Ключ | ru_ru | en_us |
-|---|---|---|
-| `death.attack.islandworld.unknown` | `%s был уничтожен незримой сущностью` | `%s was destroyed by an unseen entity` |
-| `islandworld.subtitle.unknown_death` | `Незримая сущность` | `Unseen entity` |
+| Ключ                                 | ru_ru                                 | en_us                                  |
+|--------------------------------------|---------------------------------------|----------------------------------------|
+| `death.attack.islandworld.unknown`   | `%s был уничтожен незримой сущностью` | `%s was destroyed by an unseen entity` |
+| `islandworld.subtitle.unknown_death` | `Незримая сущность`                   | `Unseen entity`                        |
 
-Ключи `islandworld.boundary.warn1–3` **не добавляются**: в обычной игре текст стадий не выводится. Для `debug_messages` текст захардкожен в `Warnings`, локализовать его можно позже.
+Ключи `islandworld.boundary.warn1–3` **не добавляются**: в обычной игре текст стадий не выводится. Для `debug_messages`
+текст захардкожен в `Warnings`, локализовать его можно позже.
 
 **Открытые вопросы:**
+
 - Наблюдатель (`spectator`) защищён так же, как творческий режим. Решение принято, открытых вопросов по защите нет.
 - Проверить в `runClient`, что `death.attack` из `lang` мода подхватывается до построения сообщения.
-- Сигнатура `ClientboundSoundPacket` и `SoundEvent.createVariableRangeEvent` в 26.3 могла измениться: проверить при реализации.
-- Громкость звука подобрать на слух: при `attenuation_distance: 4000` дальние игроки слышат его тише. Если нужна одинаковая громкость для всех, позиционный пакет заменить на звук без координат.
+- Сигнатура `ClientboundSoundPacket` и `SoundEvent.createVariableRangeEvent` в 26.3 могла измениться: проверить при
+  реализации.
+- Громкость звука подобрать на слух: при `attenuation_distance: 4000` дальние игроки слышат его тише. Если нужна
+  одинаковая громкость для всех, позиционный пакет заменить на звук без координат.
 
 ---
 
@@ -756,33 +837,33 @@ object UnknownDeath {
 public class BlackRoomChunkGenerator extends NoiseBasedChunkGenerator {
     private static final int ROOM_SIZE_CHUNKS = 9;
     private static final int HALF = ROOM_SIZE_CHUNKS / 2;
-    
+
     @Override
     public CompletableFuture<ChunkAccess> fillFromNoise(Executor executor, Blender blender,
-                                                         RandomState random, StructureManager structures,
-                                                         ChunkAccess chunk) {
+                                                        RandomState random, StructureManager structures,
+                                                        ChunkAccess chunk) {
         ChunkPos pos = chunk.getPos();
-        
+
         // Проверяем, что чанк в пределах 9×9
         if (Math.abs(pos.x) > HALF || Math.abs(pos.z) > HALF) {
             return CompletableFuture.completedFuture(chunk); // пустой чанк
         }
-        
+
         // Заполняем пол барьерами на Y=63
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 chunk.setBlockState(new BlockPos(x, 63, z), Blocks.BARRIER.defaultBlockState(), false);
             }
         }
-        
+
         // Центральный чанк (0,0): портал Незера на (8, 64, 8)
         if (pos.x == 0 && pos.z == 0) {
             buildNetherPortal(chunk);
         }
-        
+
         return CompletableFuture.completedFuture(chunk);
     }
-    
+
     private void buildNetherPortal(ChunkAccess chunk) {
         BlockPos center = new BlockPos(8, 64, 8);
         // Рамка из обсидиана 4×5
@@ -837,30 +918,31 @@ public class BlackRoomChunkGenerator extends NoiseBasedChunkGenerator {
 **`MixinNetherPortal`** (миксин на `Portal` или `NetherPortal#getPortalDestination`):
 
 ```java
+
 @Mixin(NetherPortal.class)
 public class MixinNetherPortal {
     @Inject(method = "getPortalDestination", at = @At("HEAD"), cancellable = true)
     private void onGetDestination(ServerLevel level, Entity entity, BlockPos pos,
-                                   CallbackInfoReturnable<TeleportTransition> cir) {
+                                  CallbackInfoReturnable<TeleportTransition> cir) {
         if (level.dimension() == Level.NETHER && entity instanceof ServerPlayer player) {
             // Координата в Оверворлде = pos * 8
             double targetX = pos.getX() * 8.0;
             double targetZ = pos.getZ() * 8.0;
             double distance = Math.sqrt(targetX * targetX + targetZ * targetZ);
-            
+
             if (distance > 2000) {
                 // Телепортация в чёрную комнату
                 ServerLevel blackRoom = player.server.getLevel(ModDimensions.BLACK_ROOM);
                 Vec3 spawn = new Vec3(0.5, 64.0, 0.5);
-                
+
                 TeleportTransition transition = new TeleportTransition(
-                    blackRoom,
-                    spawn,
-                    Vec3.ZERO,
-                    0, 0,
-                    TeleportTransition.DO_NOTHING
+                        blackRoom,
+                        spawn,
+                        Vec3.ZERO,
+                        0, 0,
+                        TeleportTransition.DO_NOTHING
                 );
-                
+
                 cir.setReturnValue(transition);
             }
         }
@@ -878,16 +960,16 @@ public class MixinNetherPortal {
 public class BlackRoomWrapAround {
     private static final int ROOM_SIZE = 9 * 16; // 144 блока
     private static final int HALF = ROOM_SIZE / 2;
-    
+
     public static void tick(ServerLevel level) {
         if (level.dimension() != ModDimensions.BLACK_ROOM) return;
-        
+
         for (Entity entity : level.getAllEntities()) {
             double x = entity.getX();
             double z = entity.getZ();
-            
+
             boolean wrapped = false;
-            
+
             if (x > HALF) {
                 x = -HALF + (x - HALF);
                 wrapped = true;
@@ -895,7 +977,7 @@ public class BlackRoomWrapAround {
                 x = HALF + (x + HALF);
                 wrapped = true;
             }
-            
+
             if (z > HALF) {
                 z = -HALF + (z - HALF);
                 wrapped = true;
@@ -903,7 +985,7 @@ public class BlackRoomWrapAround {
                 z = HALF + (z + HALF);
                 wrapped = true;
             }
-            
+
             if (wrapped) {
                 entity.teleportTo(x, entity.getY(), z);
             }
@@ -928,7 +1010,7 @@ public class BlackRoomProtection {
             }
             return true;
         });
-        
+
         // Запрет размещения блоков
         UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
             if (level.dimension() == ModDimensions.BLACK_ROOM) {
@@ -936,14 +1018,14 @@ public class BlackRoomProtection {
             }
             return InteractionResult.PASS;
         });
-        
+
         // Отключение спавна мобов
         ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> {
             if (level.dimension() == ModDimensions.BLACK_ROOM && entity instanceof Mob) {
                 entity.discard();
             }
         });
-        
+
         // Респавн: вернуть на остров
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
             if (newPlayer.level().dimension() == ModDimensions.BLACK_ROOM) {
@@ -994,17 +1076,17 @@ public class BlackRoomProtection {
 
 ## 7. Порядок работ
 
-| Этап | Задачи | Срок |
-|---|---|---|
-| **1. Шаблон** | gradle, структура, конфиг | 1–2 дня |
-| **2. Генерация острова** | Маска, температура, сжатие климата, пресет | 5–7 дней |
-| **3. Биомы** | `IslandBiomeSource`, гарантия всех биомов, команда `/island biomes` | 4–6 дней |
-| **4. Спавн** | Размещение на юго-западе | 1 день |
-| **5. Порталы Энда** | Стронгхолды в океане, запрет ручных | 2–3 дня |
-| **6. Граница** | `BoundaryManager`, `Warnings`, `HallucinationEffect`, `UnknownDeath` | 6–8 дней |
-| **7. Клиент** | Рендерер, шейдеры, звуки, пост-эффекты | 4–5 дней |
-| **8. Чёрная комната** | Измерение, генератор, портал, wrap-around, защита | 4–5 дней |
-| **9. Тесты** | Все сценарии, балансировка | 3–5 дней |
+| Этап                     | Задачи                                                               | Срок     |
+|--------------------------|----------------------------------------------------------------------|----------|
+| **1. Шаблон**            | gradle, структура, конфиг                                            | 1–2 дня  |
+| **2. Генерация острова** | Маска, температура, сжатие климата, пресет                           | 5–7 дней |
+| **3. Биомы**             | `IslandBiomeSource`, гарантия всех биомов, команда `/island biomes`  | 4–6 дней |
+| **4. Спавн**             | Размещение на юго-западе                                             | 1 день   |
+| **5. Порталы Энда**      | Стронгхолды в океане, запрет ручных                                  | 2–3 дня  |
+| **6. Граница**           | `BoundaryManager`, `Warnings`, `HallucinationEffect`, `UnknownDeath` | 6–8 дней |
+| **7. Клиент**            | Рендерер, шейдеры, звуки, пост-эффекты                               | 4–5 дней |
+| **8. Чёрная комната**    | Измерение, генератор, портал, wrap-around, защита                    | 4–5 дней |
+| **9. Тесты**             | Все сценарии, балансировка                                           | 3–5 дней |
 
 **Итого:** 4–6 недель.
 
@@ -1012,7 +1094,8 @@ public class BlackRoomProtection {
 
 ## 8. Главные риски
 
-1. **API версии 26.3:** проверьте названия классов (`TeleportTransition`, `DensityFunction`, `Portal`) через `genSources`.
+1. **API версии 26.3:** проверьте названия классов (`TeleportTransition`, `DensityFunction`, `Portal`) через
+   `genSources`.
 2. **Температура север-юг:** интеграция в `noise_router` может потребовать дополнительных blend-функций.
 3. **Гарантия биомов:** самая сложная часть; начните с неё.
 4. **Клиентские шейдеры:** требуют знания OpenGL; можно упростить до базовой виньетки.
@@ -1020,4 +1103,5 @@ public class BlackRoomProtection {
 
 ---
 
-> Примечание: это исходный план. Текущее состояние по разделам описано в `README.md` в корне репозитория. Примеры кода в плане — набросок, API и реализация в проекте (Kotlin) отличаются.
+> Примечание: это исходный план. Текущее состояние по разделам описано в `README.md` в корне репозитория. Примеры кода в
+> плане — набросок, API и реализация в проекте (Kotlin) отличаются.

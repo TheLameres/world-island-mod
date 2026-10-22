@@ -1,7 +1,9 @@
 package com.thelameres.islandworld
 
 import net.fabricmc.api.ModInitializer
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.resources.Identifier
 import net.minecraft.world.entity.Relative
@@ -34,7 +36,7 @@ object IslandWorldMod : ModInitializer {
 				spawn.x + 0.5,
 				spawn.y.toDouble(),
 				spawn.z + 0.5,
-				emptySet<Relative>(),
+				emptySet(),
 				0f,
 				0f,
 				false
@@ -47,7 +49,21 @@ object IslandWorldMod : ModInitializer {
 			com.thelameres.islandworld.util.SpawnUtil.reset()
 		}
 
-		LOGGER.info("Island World initialised (worldgen stage 1)")
+		// Граница 2000 блоков: конфиг, тики, отключение и респавн игрока
+		com.thelameres.islandworld.border.BoundaryManager.init(
+			com.thelameres.islandworld.border.IslandConfigLoader.load()
+		)
+		ServerTickEvents.END_SERVER_TICK.register { server ->
+			com.thelameres.islandworld.border.BoundaryManager.tick(server)
+		}
+		ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+			com.thelameres.islandworld.border.BoundaryManager.onDisconnect(handler.player.uuid)
+		}
+		ServerPlayerEvents.AFTER_RESPAWN.register { _, newPlayer, _ ->
+			com.thelameres.islandworld.border.BoundaryManager.onRespawn(newPlayer.uuid)
+		}
+
+		LOGGER.info("Island World initialised (worldgen stage 1, boundary 2000)")
 	}
 
 	fun id(path: String): Identifier = Identifier.fromNamespaceAndPath(MOD_ID, path)
