@@ -13,7 +13,7 @@ import net.minecraft.world.entity.Entity
  */
 object BlackRoomWrapAround {
 
-	private const val CHECK_INTERVAL = 10
+	private const val CHECK_INTERVAL = 9
 	private const val SIZE = BlackRoom.SIZE_BLOCKS.toDouble()
 
 	private var tickCounter = 0
@@ -28,7 +28,7 @@ object BlackRoomWrapAround {
 	}
 
 	private fun tick(level: ServerLevel) {
-		for (entity: Entity in level.getAllEntities()) {
+		for (entity: Entity in level.allEntities) {
 			val x = entity.x
 			val z = entity.z
 			val nx = wrap(x)
