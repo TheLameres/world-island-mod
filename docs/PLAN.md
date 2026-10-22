@@ -6,7 +6,7 @@
 
 ## 0. Ключевые решения после уточнений
 
-1. **Граница:** расстояние от (0, 0) по формуле Евклида, радиус 2000 блоков.
+1. **Граница:** расстояние от (0, 0) по формуле Евклида. Предупреждения на 1800, 1900 и 1950 блоках, смерть на 2000 через урон `islandworld:unknown` (без сущности). Текст стадий в обычной игре не выводится.
 2. **Спавн:** юго-западный край острова, примерно (−600, ~, −600).
 3. **Клиентский мод:** собственный рендерер сущности, пост-эффекты (shader), звуки, payload'ы для галлюцинаций.
 4. **Чёрная комната:**
@@ -44,12 +44,10 @@ islandworld/
 │  │  └─ IslandWorldPreset                (регистрация пресета)
 │  ├─ border/
 │  │  ├─ BoundaryManager                  (тик, проверка расстояния)
-│  │  ├─ BoundaryStage                    (enum: SAFE, WARN1, WARN2, KILL)
-│  │  ├─ HallucinationEffect              (пакеты, звуки, фальшивые сущности)
+│  │  ├─ Warnings                         (текст стадий только при debug_messages)
+│  │  ├─ UnknownDeath                     (урон islandworld:unknown)
+│  │  ├─ HallucinationEffect              (серверные эффекты, звуки, фейковые сущности)
 │  │  └─ PlayerBoundaryState              (Attachment API)
-│  ├─ entity/
-│  │  ├─ UnknownEntity                    (сущность-убийца)
-│  │  └─ UnknownEntityRenderer            (клиент, модель)
 │  ├─ portal/
 │  │  ├─ mixin/MixinNetherPortal          (перехват телепортации)
 │  │  ├─ BlackRoomTeleporter              (логика входа в чёрную комнату)
@@ -61,7 +59,6 @@ islandworld/
 │  ├─ network/
 │  │  ├─ payload/
 │  │  │  ├─ HallucinationPayload          (клиентские эффекты)
-│  │  │  └─ BoundaryStagePayload          (синхронизация стадии)
 │  │  └─ NetworkHandler
 │  ├─ command/
 │  │  ├─ IslandCommand                    (/island)
@@ -72,8 +69,6 @@ islandworld/
 │     └─ SpawnUtil                        (установка спавна на юго-западе)
 ├─ src/client/java/com/yourname/islandworld/client/
 │  ├─ render/
-│  │  ├─ UnknownEntityRenderer
-│  │  ├─ UnknownEntityModel
 │  │  └─ HallucinationOverlay             (пост-эффект, виньетка)
 │  ├─ sound/HallucinationSoundManager
 │  └─ shader/                             (distortion.json, vignette.json)
@@ -413,7 +408,9 @@ public class MixinEndPortalFrame {
 
 ---
 
-## 4. Этап 3. Граница 2000 блоков с галлюцинациями и убийством
+## 4. Этап 3. Граница 2000 блоков с галлюцинациями и смертью
+
+> Обновлено после уточнений: три предупреждения (1800 / 1900 / 1950), смерть на 2000 через кастомный тип урона без спавна сущности. Сообщения о стадиях в обычной игре не выводятся, эффект виден на экране. Текст стадий включается флагом `debug_messages` только для тестов. Сущность `UnknownEntity` из этого раздела удалена.
 
 ### 4.1. Конфиг
 
@@ -426,20 +423,34 @@ public class MixinEndPortalFrame {
     "center_z": 0,
     "warn1_radius": 1800,
     "warn2_radius": 1900,
+    "warn3_radius": 1950,
     "kill_radius": 2000,
-    "kill_delay_seconds": 8,
-    "check_interval_ticks": 10
+    "kill_delay_ticks": 160,
+    "check_interval_ticks": 10,
+    "reset_radius_margin": 100,
+    "debug_messages": false
+  },
+  "death_sound": {
+    "victim_sound": "islandworld:unknown_death",
+    "distant_sound": "islandworld:unknown_death_distant"
   },
   "hallucinations": {
     "stage1": {
       "effects": ["darkness:1", "nausea:1"],
-      "sounds": ["islandworld:whisper", "islandworld:distant_steps"],
+      "sounds": ["islandworld:whisper"],
       "fake_entities": 1,
       "post_effect": "vignette_light"
     },
     "stage2": {
       "effects": ["darkness:2", "nausea:2", "slowness:1"],
       "sounds": ["islandworld:scream", "islandworld:heartbeat"],
+      "fake_entities": 2,
+      "post_effect": "distortion_light",
+      "screen_shake": true
+    },
+    "stage3": {
+      "effects": ["darkness:2", "nausea:3", "slowness:2"],
+      "sounds": ["islandworld:heartbeat", "islandworld:distant_steps"],
       "fake_entities": 3,
       "post_effect": "distortion_heavy",
       "screen_shake": true
@@ -448,274 +459,247 @@ public class MixinEndPortalFrame {
 }
 ```
 
+Пояснения:
+- `kill_delay_ticks` — 160 тиков (8 секунд), задержка за границей 2000 после третьего предупреждения.
+- `reset_radius_margin` — при возврате ниже `warn1_radius − 100` (1700) счётчик предупреждений обнуляется.
+- `death_sound` — звук `distant_sound` получают все игроки сервера, кроме жертвы. Ограничения по радиусу нет.
+- `debug_messages` — `false` в обычной игре. При `true` в action bar выводится номер стадии (только для тестов).
+
 ---
 
 ### 4.2. BoundaryManager
 
-**`BoundaryManager`** (тик-событие):
+Состояние хранится на игроке в `PlayerBoundaryState`: количество выданных предупреждений (0–3) и накопленное время за границей. Enum стадий не нужен, стадия — это `warningsIssued`.
 
-```java
-public class BoundaryManager {
-    private static final Map<UUID, PlayerBoundaryState> states = new HashMap<>();
-    
-    public static void tick(MinecraftServer server) {
-        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
-        
-        for (ServerPlayer player : overworld.players()) {
-            UUID uuid = player.getUUID();
-            PlayerBoundaryState state = states.computeIfAbsent(uuid, k -> new PlayerBoundaryState());
-            
-            double distance = Math.sqrt(player.getX() * player.getX() + player.getZ() * player.getZ());
-            BoundaryStage newStage = calculateStage(distance);
-            
-            if (newStage != state.stage) {
-                state.stage = newStage;
-                state.stageTimer = 0;
-                sendStagePacket(player, newStage);
-            }
-            
-            state.stageTimer++;
-            
-            switch (newStage) {
-                case WARN1 -> HallucinationEffect.applyStage1(player, state);
-                case WARN2 -> HallucinationEffect.applyStage2(player, state);
-                case KILL -> handleKillStage(player, state);
-            }
+**`border/BoundaryManager.kt`:**
+
+```kotlin
+object BoundaryManager {
+    private val states = HashMap<UUID, PlayerBoundaryState>()
+
+    lateinit var cfg: BoundaryConfig
+        private set
+
+    fun init(config: BoundaryConfig) {
+        cfg = config
+    }
+
+    fun tick(server: MinecraftServer) {
+        if (server.tickCount % cfg.checkIntervalTicks != 0) return
+        for (player in server.overworld().players()) {
+            tickPlayer(player)
         }
     }
-    
-    private static void handleKillStage(ServerPlayer player, PlayerBoundaryState state) {
-        if (state.stageTimer > IslandConfig.BOUNDARY.killDelaySeconds * 20) {
-            UnknownEntity entity = new UnknownEntity(player.level());
-            entity.setPos(player.getX(), player.getY(), player.getZ());
-            entity.setTarget(player);
-            player.level().addFreshEntity(entity);
-            
-            state.entitySpawned = true;
+
+    private fun tickPlayer(player: ServerPlayer) {
+        val st = states.getOrPut(player.uuid) { PlayerBoundaryState() }
+        val dist = hypot(player.x - cfg.centerX, player.z - cfg.centerZ)
+
+        // Возврат в безопасную зону сбрасывает всё
+        if (dist < cfg.warn1Radius - cfg.resetRadiusMargin) {
+            st.warningsIssued = 0
+            st.beyondKillTicks = 0
+            return
+        }
+
+        // Предупреждения выдаются строго по порядку, даже если игрок перескочил несколько порогов
+        val thresholds = doubleArrayOf(cfg.warn1Radius, cfg.warn2Radius, cfg.warn3Radius)
+        while (st.warningsIssued < 3 && dist >= thresholds[st.warningsIssued]) {
+            st.warningsIssued++
+            Warnings.send(player, st.warningsIssued)
+        }
+
+        // Смерть только после всех трёх предупреждений и задержки за границей 2000.
+        // Игроки в творческом режиме и наблюдатели не умирают.
+        if (dist >= cfg.killRadius && st.warningsIssued == 3 && !isProtected(player)) {
+            st.beyondKillTicks += cfg.checkIntervalTicks
+            if (st.beyondKillTicks >= cfg.killDelayTicks) {
+                UnknownDeath.kill(player)
+                states.remove(player.uuid)
+            }
+        } else {
+            st.beyondKillTicks = 0
         }
     }
+
+    // Творческий режим и наблюдатель не получают урон от границы
+    private fun isProtected(player: ServerPlayer): Boolean =
+        player.isCreative || player.isSpectator
+
+    fun onDisconnect(uuid: UUID) { states.remove(uuid) }
+    fun onRespawn(uuid: UUID) { states.remove(uuid) }
+}
+
+class PlayerBoundaryState {
+    var warningsIssued = 0
+    var beyondKillTicks = 0
 }
 ```
+
+Регистрация в `IslandWorldMod.kt`: `ServerTickEvents.END_SERVER_TICK`, `ServerPlayConnectionEvents.DISCONNECT`, `ServerPlayerEvents.AFTER_RESPAWN`.
 
 ---
 
-### 4.3. HallucinationEffect
+### 4.3. Warnings и HallucinationEffect
 
-**`HallucinationEffect`** (серверная часть):
+**`border/Warnings.kt`:**
 
-```java
-public class HallucinationEffect {
-    public static void applyStage1(ServerPlayer player, PlayerBoundaryState state) {
-        // Эффекты зелий
-        player.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 100, 0, true, false));
-        
-        // Звуки (только для этого игрока)
-        if (state.stageTimer % 100 == 0) {
-            player.connection.send(new ClientboundSoundPacket(
-                SoundEvents.AMBIENT_CAVE.value(),
-                SoundSource.AMBIENT,
-                player.getX(), player.getY(), player.getZ(),
-                1.0f, 0.8f,
-                player.level().random.nextLong()
-            ));
+```kotlin
+object Warnings {
+    fun send(player: ServerPlayer, stage: Int) {
+        // Текст стадии только при debug_messages (для тестов)
+        if (BoundaryManager.cfg.debugMessages) {
+            player.displayClientMessage(Component.literal("[Boundary] стадия $stage"), true)
         }
-        
-        // Фальшивая сущность вдали (пакет spawn)
-        if (state.stageTimer == 20 && state.fakeEntities.isEmpty()) {
-            spawnFakeEntity(player, 20.0);
-        }
-        
-        // Клиентский пост-эффект
-        NetworkHandler.sendToClient(player, new HallucinationPayload("vignette_light", 1));
-    }
-    
-    private static void spawnFakeEntity(ServerPlayer player, double distance) {
-        // Спавним фальшивого зомби позади игрока
-        Vec3 behind = player.position().add(player.getLookAngle().scale(-distance));
-        
-        ClientboundAddEntityPacket packet = new ClientboundAddEntityPacket(
-            /* временный ID */ -9999,
-            UUID.randomUUID(),
-            behind.x, behind.y, behind.z,
-            0, 0,
-            EntityType.ZOMBIE,
-            0,
-            Vec3.ZERO,
-            0
-        );
-        
-        player.connection.send(packet);
-        
-        // Удаляем через 3 секунды
-        player.server.execute(() -> {
-            player.connection.send(new ClientboundRemoveEntitiesPacket(-9999));
-        }, 60);
+        // Основной сигнал для игрока — визуальные эффекты
+        HallucinationEffect.apply(player, stage)
     }
 }
 ```
 
-**`HallucinationPayload`** (Fabric Networking API v1):
+**`border/HallucinationEffect.kt`** (серверная часть):
+- Применяет эффекты из `hallucinations.stageN.effects` (`darkness`, `nausea`, `slowness`).
+- Проигрывает звуки из `sounds` (только у этого игрока, через `ClientboundSoundPacket`).
+- Отправляет `HallucinationPayload(stage)` клиенту для шейдеров и виньетки.
+- Фейковые сущности (зомби за спиной) спавнятся через `ClientboundAddEntityPacket` с **сохранённым ID**. Удаляются точным `ClientboundRemoveEntitiesPacket(id)` через 3 секунды. Хак с фиксированным ID `-9999` из старой версии не используется.
 
-```java
-public record HallucinationPayload(String effectName, int intensity) implements CustomPayload {
-    public static final Id<HallucinationPayload> ID = 
-        new Id<>(new ResourceLocation("islandworld", "hallucination"));
-    
-    @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+**`network/payload/HallucinationPayload.kt`:**
+
+```kotlin
+data class HallucinationPayload(val stage: Int) : CustomPayload {
+    companion object {
+        val ID = CustomPayload.Id<HallucinationPayload>(IslandWorldIds.id("hallucination"))
     }
+    override fun id() = ID
 }
 ```
+
+`BoundaryStagePayload` из старого плана удалён: один payload покрывает и синхронизацию стадии, и визуальные эффекты.
 
 ---
 
-### 4.4. Клиентская часть: рендер и шейдеры
+### 4.4. Клиент: шейдеры, виньетка, звуки
 
-**`IslandWorldClient.java`:**
-
-```java
-public class IslandWorldClient implements ClientModInitializer {
-    @Override
-    public void onInitializeClient() {
-        ClientPlayNetworking.registerGlobalReceiver(HallucinationPayload.ID, 
-            (payload, context) -> {
-                context.client().execute(() -> {
-                    HallucinationOverlay.apply(payload.effectName(), payload.intensity());
-                });
-            }
-        );
-        
-        EntityRendererRegistry.register(ModEntities.UNKNOWN, UnknownEntityRenderer::new);
-    }
-}
-```
+**`IslandWorldClient.kt`:**
+- Принимает `HallucinationPayload` и вызывает `HallucinationOverlay.apply(stage)`.
+- Регистрация `UnknownEntityRenderer` **удалена**.
 
 **`HallucinationOverlay`:**
+- `stage 1`: виньетка (`vignette.json`).
+- `stage 2`: лёгкое искажение (`distortion.json`, интенсивность 0.05) и встряхивание камеры.
+- `stage 3`: сильное искажение (интенсивность 0.12), усиленная виньетка, тряска.
 
-```java
-public class HallucinationOverlay {
-    private static String currentEffect = "";
-    private static int intensity = 0;
-    private static final Random random = new Random();
-    
-    public static void apply(String effect, int level) {
-        currentEffect = effect;
-        intensity = level;
-        
-        // Загружаем пост-процессинг шейдер
-        Minecraft mc = Minecraft.getInstance();
-        if (effect.equals("distortion_heavy")) {
-            mc.gameRenderer.loadEffect(new ResourceLocation("islandworld", "shaders/post/distortion.json"));
+Тряска камеры — только клиентская. Серверный `setXRot` из старой версии убран.
+
+Файлы: `shaders/post/distortion.json`, `shaders/post/vignette.json`, `sounds.json` для `islandworld:whisper`, `scream`, `heartbeat`, `distant_steps`, `unknown_death`, `unknown_death_distant`.
+
+---
+
+### 4.5. Смерть от незримой сущности и звуки смерти
+
+Сущности нет. Игрок умирает от кастомного типа урона `islandworld:unknown`, поэтому ванильная система смертей сама подставляет имя игрока в текст.
+
+**Творческий режим и наблюдатель.** Игроки в творческом режиме (`player.isCreative`) и в режиме наблюдателя (`player.isSpectator`) этот урон не получают. Проверка `isProtected()` стоит в `BoundaryManager` перед вызовом `UnknownDeath.kill()`, поэтому для них не выполняется ни урон, ни звуки смерти. Предупреждения и галлюцинации у них остаются, потому что они не связаны со смертью. Если игрок переключился в творческий режим уже после смерти по таймеру, таймер сбрасывается, потому что условие не выполняется.
+
+Во время смерти звучат два кастомных звука:
+- `islandworld:unknown_death` — слышит только жертва. Отправляется в её соединение, без позиции, громкость 1.0.
+- `islandworld:unknown_death_distant` — слышат **все остальные игроки сервера**, независимо от расстояния. Звук позиционный, в точке смерти. Чтобы он был слышен на любом расстоянии в пределах мира, затухание задано большим (`attenuation_distance: 4000`, см. `sounds.json`). Жертва в этот список не входит, чтобы она не слышала два звука.
+
+Порядок в `kill()`: сначала звук жертве, затем звук всем остальным игрокам, и только потом урон. Так звуки успевают уйти до экрана смерти.
+
+**`border/UnknownDeath.kt`:**
+
+```kotlin
+object UnknownDeath {
+    val DAMAGE_TYPE: ResourceKey<DamageType> =
+        ResourceKey.create(Registries.DAMAGE_TYPE, IslandWorldIds.id("unknown"))
+
+    val VICTIM_SOUND: Holder<SoundEvent> =
+        Holder.direct(SoundEvent.createVariableRangeEvent(IslandWorldIds.id("unknown_death")))
+    val DISTANT_SOUND: Holder<SoundEvent> =
+        Holder.direct(SoundEvent.createVariableRangeEvent(IslandWorldIds.id("unknown_death_distant")))
+
+    fun kill(player: ServerPlayer) {
+        val level = player.level()
+        val seed = level.random.nextLong()
+
+        // 1. Жертва: звук только ей, без позиции
+        player.connection.send(
+            ClientboundSoundPacket(VICTIM_SOUND, SoundSource.MASTER,
+                player.x, player.y, player.z, 1.0f, 1.0f, seed)
+        )
+
+        // 2. Все остальные игроки сервера: позиционный звук в точке смерти, без ограничения радиусом
+        for (other in player.server.playerList.players) {
+            if (other === player) continue
+            other.connection.send(
+                ClientboundSoundPacket(DISTANT_SOUND, SoundSource.HOSTILE,
+                    player.x, player.y, player.z, 1.0f, 1.0f, seed)
+            )
         }
-        
-        // Встряхивание камеры
-        if (level >= 2) {
-            shakeCamera();
-        }
-    }
-    
-    private static void shakeCamera() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            float shake = 0.5f;
-            mc.player.setXRot(mc.player.getXRot() + (random.nextFloat() - 0.5f) * shake);
-            mc.player.setYRot(mc.player.getYRot() + (random.nextFloat() - 0.5f) * shake);
-        }
+
+        // 3. Урон: тип и текст смерти
+        player.hurt(player.damageSources().source(DAMAGE_TYPE), Float.MAX_VALUE)
     }
 }
 ```
 
-**`assets/islandworld/shaders/post/distortion.json`:**
+Конфиг `death_sound` читается в data class `DeathSoundConfig(victimSound, distantSound)` и кладётся в `BoundaryConfig.deathSound`.
+
+**`assets/islandworld/sounds.json`:**
 
 ```json
 {
-  "targets": ["swap"],
-  "passes": [
-    {
-      "name": "islandworld:distortion",
-      "intarget": "minecraft:main",
-      "outtarget": "swap",
-      "uniforms": [
-        { "name": "Intensity", "values": [0.05, 0.05, 0.05] },
-        { "name": "Time", "values": [0.0] }
-      ]
-    },
-    {
-      "name": "blit",
-      "intarget": "swap",
-      "outtarget": "minecraft:main"
-    }
-  ]
+  "unknown_death": {
+    "subtitle": "islandworld.subtitle.unknown_death",
+    "sounds": [{ "name": "islandworld:unknown_death", "stream": false }]
+  },
+  "unknown_death_distant": {
+    "subtitle": "islandworld.subtitle.unknown_death",
+    "sounds": [{
+      "name": "islandworld:unknown_death_distant",
+      "stream": false,
+      "attenuation_distance": 4000
+    }]
+  }
 }
 ```
 
-Fragment shader (`distortion.fsh`) с wave-искажением координат текстуры.
+`attenuation_distance: 4000` держит звук слышимым по всей области границы (диаметр 4000 блоков). Громкость на больших расстояниях всё равно ниже, поэтому далёкие игроки слышат его тише. Субтитры для глухих можно не добавлять, тогда ключ `subtitle` убрать. Файлы `.ogg` (`unknown_death.ogg`, `unknown_death_distant.ogg`) в `assets/islandworld/sounds/` нужно подготовить заранее. Без них клиент покажет ошибку загрузки звука.
 
----
+**`data/islandworld/damage_type/unknown.json`:**
 
-### 4.5. UnknownEntity
-
-**`UnknownEntity.java`:**
-
-```java
-public class UnknownEntity extends Monster {
-    public UnknownEntity(EntityType<? extends Monster> type, Level level) {
-        super(type, level);
-        this.setInvulnerable(true);
-    }
-    
-    @Override
-    protected void registerGoals() {
-        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 2.0, false));
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, false));
-    }
-    
-    @Override
-    public boolean hurt(DamageSource source, float amount) {
-        return false; // неубиваема
-    }
-    
-    @Override
-    public void tick() {
-        super.tick();
-        
-        // Телепортация к цели, если далеко
-        if (getTarget() instanceof Player player) {
-            if (distanceToSqr(player) > 100) {
-                Vec3 behind = player.position().add(player.getLookAngle().scale(-3));
-                teleportTo(behind.x, behind.y, behind.z);
-            }
-            
-            // Убийство при контакте
-            if (distanceToSqr(player) < 4) {
-                player.hurt(damageSources().source(ModDamageTypes.UNKNOWN, this), Float.MAX_VALUE);
-                this.discard();
-            }
-        }
-    }
+```json
+{
+  "message_id": "islandworld.unknown",
+  "scaling": "never",
+  "exhaustion": 0.0
 }
 ```
 
-**`UnknownEntityRenderer`:**
+**`data/minecraft/tags/damage_type/bypasses_invulnerability.json`** — тотем и бессмертие не спасают. Имя тега проверить в 26.3.
 
-```java
-public class UnknownEntityRenderer extends MobRenderer<UnknownEntity, UnknownEntityModel> {
-    private static final ResourceLocation TEXTURE = 
-        new ResourceLocation("islandworld", "textures/entity/unknown/unknown.png");
-    
-    public UnknownEntityRenderer(EntityRendererProvider.Context context) {
-        super(context, new UnknownEntityModel(context.bakeLayer(ModModelLayers.UNKNOWN)), 0.5f);
-    }
-    
-    @Override
-    public ResourceLocation getTextureLocation(UnknownEntity entity) {
-        return TEXTURE;
-    }
+```json
+{
+  "replace": false,
+  "values": ["islandworld:unknown"]
 }
 ```
 
-Модель — гуманоидная или абстрактная (тень с глазами), создаётся через Blockbench.
+**Локализация:**
+
+| Ключ | ru_ru | en_us |
+|---|---|---|
+| `death.attack.islandworld.unknown` | `%s был уничтожен незримой сущностью` | `%s was destroyed by an unseen entity` |
+| `islandworld.subtitle.unknown_death` | `Незримая сущность` | `Unseen entity` |
+
+Ключи `islandworld.boundary.warn1–3` **не добавляются**: в обычной игре текст стадий не выводится. Для `debug_messages` текст захардкожен в `Warnings`, локализовать его можно позже.
+
+**Открытые вопросы:**
+- Наблюдатель (`spectator`) защищён так же, как творческий режим. Решение принято, открытых вопросов по защите нет.
+- Проверить в `runClient`, что `death.attack` из `lang` мода подхватывается до построения сообщения.
+- Сигнатура `ClientboundSoundPacket` и `SoundEvent.createVariableRangeEvent` в 26.3 могла измениться: проверить при реализации.
+- Громкость звука подобрать на слух: при `attenuation_distance: 4000` дальние игроки слышат его тише. Если нужна одинаковая громкость для всех, позиционный пакет заменить на звук без координат.
 
 ---
 
@@ -994,8 +978,6 @@ public class BlackRoomProtection {
 {
   "death.attack.islandworld.unknown": "%s был поглощён неизвестной сущностью",
   "islandworld.portal.blocked": "Портал не активируется так близко к центру острова",
-  "islandworld.boundary.warn1": "Вам не следует идти дальше...",
-  "islandworld.boundary.warn2": "Поверните назад, пока не поздно!",
   "generator.islandworld.island": "Остров в океане"
 }
 ```
@@ -1019,7 +1001,7 @@ public class BlackRoomProtection {
 | **3. Биомы** | `IslandBiomeSource`, гарантия всех биомов, команда `/island biomes` | 4–6 дней |
 | **4. Спавн** | Размещение на юго-западе | 1 день |
 | **5. Порталы Энда** | Стронгхолды в океане, запрет ручных | 2–3 дня |
-| **6. Граница** | `BoundaryManager`, галлюцинации, `UnknownEntity` | 6–8 дней |
+| **6. Граница** | `BoundaryManager`, `Warnings`, `HallucinationEffect`, `UnknownDeath` | 6–8 дней |
 | **7. Клиент** | Рендерер, шейдеры, звуки, пост-эффекты | 4–5 дней |
 | **8. Чёрная комната** | Измерение, генератор, портал, wrap-around, защита | 4–5 дней |
 | **9. Тесты** | Все сценарии, балансировка | 3–5 дней |
