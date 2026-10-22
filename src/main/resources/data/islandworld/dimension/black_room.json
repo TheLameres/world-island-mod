@@ -1,0 +1,11 @@
+{
+  "type": "islandworld:black_room",
+  "generator": {
+    "type": "islandworld:black_room_generator",
+    "settings": "minecraft:overworld",
+    "biome_source": {
+      "type": "minecraft:fixed",
+      "biome": "islandworld:black_room"
+    }
+  }
+}

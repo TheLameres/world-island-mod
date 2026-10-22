@@ -31,10 +31,15 @@ object IslandWorldMod : ModInitializer {
     override fun onInitialize() {
         ModDensityFunctions.register()
 
-        // Первый вход игрока: телепорт на берег океана у (-930, 600)
-        ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
-            val player = handler.player
-            if (FirstJoinStore.hasJoined(server, player.uuid)) return@register
+		// Чёрная комната (план, раздел 5)
+		com.thelameres.islandworld.worldgen.blackroom.BlackRoomChunkGenerator.register()
+		com.thelameres.islandworld.worldgen.blackroom.BlackRoomWrapAround.register()
+		com.thelameres.islandworld.worldgen.blackroom.BlackRoomProtection.register()
+
+		// Первый вход игрока: телепорт на берег океана у (-930, 600)
+		ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
+			val player = handler.player
+			if (com.thelameres.islandworld.util.FirstJoinStore.hasJoined(server, player.uuid)) return@register
 
             val level = server.overworld()
             val spawn = SpawnUtil.findPlayerSpawn(level)

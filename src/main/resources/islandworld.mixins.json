@@ -2,7 +2,9 @@
 	"required": true,
 	"package": "com.thelameres.islandworld.mixin",
 	"compatibilityLevel": "JAVA_25",
-	"mixins": [],
+	"mixins": [
+		"MixinNetherPortal"
+	],
 	"injectors": {
 		"defaultRequire": 1
 	},
