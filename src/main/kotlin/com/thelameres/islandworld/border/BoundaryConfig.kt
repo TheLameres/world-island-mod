@@ -20,6 +20,16 @@ data class BoundaryConfig(
 	@SerializedName("debug_messages") val debugMessages: Boolean = false,
 )
 
+/** Респавн после смерти от границы: случайный край острова. */
+data class RespawnConfig(
+	/** Внешний радиус поиска края от центра. По умолчанию чуть ниже первого предупреждения, чтобы не получить сразу предупреждение. */
+	@SerializedName("max_radius") val maxRadius: Double = 1799.0,
+	/** Сколько случайных направлений проверить, прежде чем сдаться и использовать спавн мира. */
+	val attempts: Int = 24,
+	/** Насколько далеко за точкой должна быть вода, чтобы точка считалась краем острова. */
+	@SerializedName("coast_check_radius") val coastCheckRadius: Int = 12,
+)
+
 /** Стадия галлюцинаций: эффекты в формате "name:level", например "darkness:1". */
 data class StageConfig(
 	val effects: List<String> = emptyList(),
@@ -27,6 +37,7 @@ data class StageConfig(
 
 data class IslandConfigFile(
 	val boundary: BoundaryConfig = BoundaryConfig(),
+	val respawn: RespawnConfig = RespawnConfig(),
 	val hallucinations: Map<String, StageConfig> = linkedMapOf(
 		"stage1" to StageConfig(listOf("darkness:1", "nausea:1")),
 		"stage2" to StageConfig(listOf("darkness:2", "nausea:2", "slowness:1")),

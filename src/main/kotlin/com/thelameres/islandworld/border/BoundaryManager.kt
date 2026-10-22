@@ -17,6 +17,7 @@ object BoundaryManager {
 		private set
 
 	val cfg: BoundaryConfig get() = config.boundary
+	val respawn: RespawnConfig get() = config.respawn
 
 	fun init(file: IslandConfigFile) {
 		config = file
@@ -72,6 +73,7 @@ object BoundaryManager {
 
 	fun onDisconnect(uuid: UUID) {
 		states.remove(uuid)
+		EdgeRespawn.clear(uuid)
 	}
 
 	fun onRespawn(uuid: UUID) {

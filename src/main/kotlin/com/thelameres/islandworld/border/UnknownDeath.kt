@@ -12,7 +12,7 @@ import net.minecraft.sounds.SoundSource
 import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.damagesource.DamageType
 
-/** Смерть от неизвестной сущности: звуки + урон islandworld:unknown. */
+/** Смерть от неизвестной сущности: звуки + урон islandworld:unknown + отметка на респавн у края острова. */
 object UnknownDeath {
 	val DAMAGE_TYPE_KEY: ResourceKey<DamageType> =
 		ResourceKey.create(Registries.DAMAGE_TYPE, IslandWorldMod.id("unknown"))
@@ -39,7 +39,10 @@ object UnknownDeath {
 			)
 		}
 
-		// 3. Урон (тип islandworld:unknown обходит бессмертие через тег)
+		// 3. Отмечаем игрока: после респавна его перенесёт на случайный край острова
+		EdgeRespawn.markPending(player.uuid)
+
+		// 4. Урон (тип islandworld:unknown обходит бессмертие через тег)
 		val holder = level.registryAccess()
 			.lookupOrThrow(Registries.DAMAGE_TYPE)
 			.getOrThrow(DAMAGE_TYPE_KEY)
