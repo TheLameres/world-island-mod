@@ -18,12 +18,14 @@ import kotlin.math.sqrt
  * Координаты: юг = +Z, запад = -X.
  *
  * Алгоритм:
- *  1. Идём по кольцам вокруг целевой точки с возрастающим радиусом.
- *  2. На каждом кольце проверяем колонки по окружности.
- *  3. Первая колонка, где есть земля/трава/песок под ногами, свободный воздух,
- *     нет дерева над головой и рядом (SHORE_DISTANCE) есть океан, — результат.
- *     Так находится ближайшая к цели подходящая точка у берега.
- *  4. Результат кэшируется на сессию сервера.
+ *  1. От целевой точки ищем ближайшую сушу: колонку с биомом, который не входит
+ *     в #minecraft:is_ocean. Если сама цель на суше, это она.
+ *  2. От найденной суши ищем ближайшее место у берега: земля/трава/песок под ногами,
+ *     свободный воздух, нет дерева над головой и рядом (SHORE_DISTANCE) есть океан.
+ *  3. Результат кэшируется на сессию сервера.
+ *
+ * Поиск идёт кольцами с возрастающим радиусом, поэтому всегда возвращается ближайший
+ * подходящий вариант, а не первый попавшийся.
  */
 object SpawnUtil {
 
@@ -32,9 +34,11 @@ object SpawnUtil {
 	const val TARGET_X = -930
 	const val TARGET_Z = 600
 
-	/** Максимальный радиус поиска от цели. */
-	private const val MAX_RADIUS = 400
-	/** Шаг между кольцами. */
+	/** Максимальный радиус поиска суши от цели. */
+	private const val LAND_MAX_RADIUS = 400
+	/** Максимальный радиус поиска берега от найденной суши. */
+	private const val COAST_MAX_RADIUS = 200
+	/** Шаг между кольцами, блоки. */
 	private const val RING_STEP = 4
 	/** Угловой шаг на кольце, градусы. */
 	private const val ANGLE_STEP_DEG = 6
@@ -59,33 +63,63 @@ object SpawnUtil {
 	fun findPlayerSpawn(level: ServerLevel): BlockPos? {
 		cachedSpawn?.let { return it }
 
-		val spawn = findNearestCoastSpawn(level)
+		val land = findNearestLand(level, TARGET_X, TARGET_Z)
+		if (land == null) {
+			LOGGER.warn("Суша рядом с ({}, {}) не найдена", TARGET_X, TARGET_Z)
+			return null
+		}
+		LOGGER.info("Ближайшая суша к цели: {}", land)
+
+		val spawn = findCoastSpawn(level, land.x, land.z)
 		if (spawn == null) {
-			LOGGER.warn("Подходящее место у океана рядом с ({}, {}) не найдено", TARGET_X, TARGET_Z)
+			LOGGER.warn("Место у берега рядом с {} не найдено", land)
 			return null
 		}
 		cachedSpawn = spawn
-		val dist = sqrt(
-			((spawn.x - TARGET_X) * (spawn.x - TARGET_X) + (spawn.z - TARGET_Z) * (spawn.z - TARGET_Z)).toDouble()
-		)
-		LOGGER.info("Стартовая точка у океана: {} (до цели {} блоков)", spawn, dist.toInt())
+
+		val dx = (spawn.x - TARGET_X).toDouble()
+		val dz = (spawn.z - TARGET_Z).toDouble()
+		LOGGER.info("Стартовая точка у океана: {} (до цели {} блоков)", spawn, sqrt(dx * dx + dz * dz).toInt())
 		return spawn
 	}
 
-	/** Кольца от цели наружу; возвращает первую подходящую колонку. */
-	private fun findNearestCoastSpawn(level: ServerLevel): BlockPos? {
+	/** Ближайшая к (cx, cz) колонка, биом которой не океанский. */
+	private fun findNearestLand(level: ServerLevel, cx: Int, cz: Int): BlockPos? =
+		findInRings(level, cx, cz, LAND_MAX_RADIUS) { x, z ->
+			val surface = BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1, z)
+			if (!isOceanAt(level, surface)) surface else null
+		}
+
+	/** Ближайшее к (cx, cz) место у берега, пригодное для спавна. */
+	private fun findCoastSpawn(level: ServerLevel, cx: Int, cz: Int): BlockPos? =
+		findInRings(level, cx, cz, COAST_MAX_RADIUS) { x, z ->
+			findSpawnInColumn(level, x, z)
+		}
+
+	/**
+	 * Проверяет колонки кольцами от центра наружу до maxRadius.
+	 * Возвращает первый результат test, не равный null.
+	 */
+	private inline fun findInRings(
+		level: ServerLevel,
+		cx: Int,
+		cz: Int,
+		maxRadius: Int,
+		test: (Int, Int) -> BlockPos?
+	): BlockPos? {
 		var r = 0
-		while (r <= MAX_RADIUS) {
+		while (r <= maxRadius) {
 			if (r == 0) {
-				findSpawnInColumn(level, TARGET_X, TARGET_Z)?.let { return it }
+				level.getChunk(cx shr 4, cz shr 4)
+				test(cx, cz)?.let { return it }
 			} else {
 				var deg = 0
 				while (deg < 360) {
 					val rad = Math.toRadians(deg.toDouble())
-					val x = TARGET_X + Math.round(cos(rad) * r).toInt()
-					val z = TARGET_Z + Math.round(sin(rad) * r).toInt()
+					val x = cx + Math.round(cos(rad) * r).toInt()
+					val z = cz + Math.round(sin(rad) * r).toInt()
 					level.getChunk(x shr 4, z shr 4)
-					findSpawnInColumn(level, x, z)?.let { return it }
+					test(x, z)?.let { return it }
 					deg += ANGLE_STEP_DEG
 				}
 			}
