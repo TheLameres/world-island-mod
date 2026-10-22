@@ -1,5 +1,18 @@
 {
-  "type": "islandworld:north_south_temperature",
-  "cold_z": -1000.0,
-  "hot_z": 1000.0
+  "type": "minecraft:add",
+  "left": {
+    "type": "islandworld:north_south_temperature",
+    "cold_z": -1000.0,
+    "hot_z": 1000.0
+  },
+  "right": {
+    "type": "minecraft:mul",
+    "left": {
+      "type": "minecraft:noise",
+      "noise": "minecraft:temperature",
+      "xz_scale": 0.35,
+      "y_scale": 0.0
+    },
+    "right": 0.45
+  }
 }
