@@ -2,90 +2,136 @@ package com.thelameres.islandworld.util
 
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.tags.BiomeTags
 import net.minecraft.tags.BlockTags
-import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.levelgen.Heightmap
-import net.minecraft.world.level.storage.LevelData
 import org.slf4j.LoggerFactory
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
- * Установка мирового спавна на юго-западе острова.
+ * Стартовая точка игрока у океана рядом с целевой точкой (-930, 600) на юго-западе острова.
  *
- * Координаты: юг = +Z, запад = -X (см. north_south_temperature: hot_z = +1000 на юге).
- * Спавн ищется по спирали вокруг цели; подходящая позиция должна:
- *  - стоять на земле (dirt/grass/podzol/mud...) или песке;
- *  - не находиться на дереве (ни ствол, ни листва под/над игроком);
- *  - не быть в воде и иметь два свободных блока над головой.
+ * Координаты: юг = +Z, запад = -X.
+ *
+ * Алгоритм:
+ *  1. Идём по кольцам вокруг целевой точки с возрастающим радиусом.
+ *  2. На каждом кольце проверяем колонки по окружности.
+ *  3. Первая колонка, где есть земля/трава/песок под ногами, свободный воздух,
+ *     нет дерева над головой и рядом (SHORE_DISTANCE) есть океан, — результат.
+ *     Так находится ближайшая к цели подходящая точка у берега.
+ *  4. Результат кэшируется на сессию сервера.
  */
 object SpawnUtil {
 
 	private val LOGGER = LoggerFactory.getLogger("islandworld/spawn")
 
-	const val TARGET_X = -600
+	const val TARGET_X = -930
 	const val TARGET_Z = 600
-	const val SEARCH_RADIUS = 200
-	private const val STEP = 2
+
+	/** Максимальный радиус поиска от цели. */
+	private const val MAX_RADIUS = 400
+	/** Шаг между кольцами. */
+	private const val RING_STEP = 4
+	/** Угловой шаг на кольце, градусы. */
+	private const val ANGLE_STEP_DEG = 6
+
+	/** Максимальное расстояние от спавна до океана. */
+	private const val SHORE_DISTANCE = 8
 	private const val TREE_CHECK_HEIGHT = 6
 
-	fun setIslandSpawn(level: ServerLevel) {
-		val spawn = findSafeLandSpawn(level, TARGET_X, TARGET_Z, SEARCH_RADIUS)
-		if (spawn == null) {
-			LOGGER.warn("Не найдено подходящее место для спавна рядом с ({}, {}), оставлен ванильный спавн", TARGET_X, TARGET_Z)
-			return
-		}
-		level.respawnData = LevelData.RespawnData.of(Level.OVERWORLD, spawn, 90f, 0f)
+	/** Результат поиска не меняется за сессию, поэтому кэшируем. */
+	@Volatile
+	private var cachedSpawn: BlockPos? = null
 
-		LOGGER.info("Мировой спавн установлен: {}", spawn)
+	/** Сбрасывает кэш (вызывается при остановке сервера). */
+	fun reset() {
+		cachedSpawn = null
 	}
 
-	/** Перебирает колонки по спирали от цели, возвращает ближайшую подходящую позицию. */
-	private fun findSafeLandSpawn(level: ServerLevel, cx: Int, cz: Int, radius: Int): BlockPos? {
-		val candidates = ArrayList<IntArray>()
-		var dx = -radius
-		while (dx <= radius) {
-			var dz = -radius
-			while (dz <= radius) {
-				candidates.add(intArrayOf(dx, dz))
-				dz += STEP
-			}
-			dx += STEP
-		}
-		candidates.sortBy { it[0] * it[0] + it[1] * it[1] }
+	/**
+	 * Возвращает стартовую точку или null, если подходящего места нет.
+	 * Первый вызов тяжёлый, дальше используется кэш.
+	 */
+	fun findPlayerSpawn(level: ServerLevel): BlockPos? {
+		cachedSpawn?.let { return it }
 
-		for ((ox, oz) in candidates.map { it[0] to it[1] }) {
-			val x = cx + ox
-			val z = cz + oz
-			// Загружаем чанк (нужен для heightmap и блоков)
-			level.getChunk(x shr 4, z shr 4)
-			val pos = findSpawnInColumn(level, x, z)
-			if (pos != null) return pos
+		val spawn = findNearestCoastSpawn(level)
+		if (spawn == null) {
+			LOGGER.warn("Подходящее место у океана рядом с ({}, {}) не найдено", TARGET_X, TARGET_Z)
+			return null
+		}
+		cachedSpawn = spawn
+		val dist = sqrt(
+			((spawn.x - TARGET_X) * (spawn.x - TARGET_X) + (spawn.z - TARGET_Z) * (spawn.z - TARGET_Z)).toDouble()
+		)
+		LOGGER.info("Стартовая точка у океана: {} (до цели {} блоков)", spawn, dist.toInt())
+		return spawn
+	}
+
+	/** Кольца от цели наружу; возвращает первую подходящую колонку. */
+	private fun findNearestCoastSpawn(level: ServerLevel): BlockPos? {
+		var r = 0
+		while (r <= MAX_RADIUS) {
+			if (r == 0) {
+				findSpawnInColumn(level, TARGET_X, TARGET_Z)?.let { return it }
+			} else {
+				var deg = 0
+				while (deg < 360) {
+					val rad = Math.toRadians(deg.toDouble())
+					val x = TARGET_X + Math.round(cos(rad) * r).toInt()
+					val z = TARGET_Z + Math.round(sin(rad) * r).toInt()
+					level.getChunk(x shr 4, z shr 4)
+					findSpawnInColumn(level, x, z)?.let { return it }
+					deg += ANGLE_STEP_DEG
+				}
+			}
+			r += RING_STEP
 		}
 		return null
 	}
 
-	/** Ищет сверху вниз первую позицию, где под ногами земля/песок, а сама позиция свободна. */
+	/** Сверху вниз: земля/трава/песок под ногами, свободно, без дерева, рядом океан. */
 	private fun findSpawnInColumn(level: ServerLevel, x: Int, z: Int): BlockPos? {
 		val top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
 		var y = top
 		val minY = level.minY + 1
 		while (y > minY) {
 			val feet = BlockPos(x, y, z)
-			val groundState = level.getBlockState(feet.below())
-			if (isGround(groundState)
+			if (isGround(level.getBlockState(feet.below()))
 				&& isPassable(level, feet)
 				&& isPassable(level, feet.above())
 			) {
-				// Если над нами дерево (листва/стволы) — колонка не подходит
-				return if (hasTreeAbove(level, feet)) null else feet
+				if (hasTreeAbove(level, feet)) return null
+				return if (isOceanNearby(level, feet)) feet else null
 			}
 			y--
 		}
 		return null
 	}
 
+	private fun isOceanNearby(level: ServerLevel, feet: BlockPos): Boolean {
+		for (dx in -SHORE_DISTANCE..SHORE_DISTANCE step 2) {
+			for (dz in -SHORE_DISTANCE..SHORE_DISTANCE step 2) {
+				val x = feet.x + dx
+				val z = feet.z + dz
+				val surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1
+				if (isOceanAt(level, BlockPos(x, surfaceY, z))) return true
+			}
+		}
+		return false
+	}
+
+	private fun isOceanAt(level: ServerLevel, pos: BlockPos): Boolean =
+		level.getBiome(pos).`is`(BiomeTags.IS_OCEAN)
+
 	private fun isGround(state: BlockState): Boolean =
-		state.`is`(BlockTags.DIRT) || state.`is`(BlockTags.SAND)
+		state.`is`(BlockTags.DIRT)
+			|| state.`is`(BlockTags.SAND)
+			|| state.`is`(Blocks.GRASS_BLOCK)
 
 	private fun isPassable(level: ServerLevel, pos: BlockPos): Boolean {
 		val state = level.getBlockState(pos)
