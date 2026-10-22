@@ -7,6 +7,6 @@
     "y_scale": 0.0
   },
   "island_radius": 1000.0,
-  "edge_softness": 300.0,
+  "edge_softness": 250.0,
   "noise_amplitude": 200.0
 }
