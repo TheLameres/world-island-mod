@@ -2,26 +2,21 @@ package com.thelameres.islandworld
 
 import com.thelameres.islandworld.border.BoundaryManager
 import com.thelameres.islandworld.border.BoundaryManager.onDisconnect
-import com.thelameres.islandworld.border.BoundaryManager.onRespawn
 import com.thelameres.islandworld.border.EdgeRespawn
-import com.thelameres.islandworld.border.EdgeRespawn.handleRespawn
 import com.thelameres.islandworld.border.IslandConfigLoader
-import com.thelameres.islandworld.border.UnknownDeath
 import com.thelameres.islandworld.util.FirstJoinStore
 import com.thelameres.islandworld.util.SpawnUtil
 import com.thelameres.islandworld.worldgen.density.ModDensityFunctions
 import net.fabricmc.api.ModInitializer
-import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.resources.Identifier
-import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.storage.LevelData
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+
 
 object IslandWorldMod : ModInitializer {
     const val MOD_ID: String = "islandworld"
@@ -30,18 +25,19 @@ object IslandWorldMod : ModInitializer {
 
     override fun onInitialize() {
         ModDensityFunctions.register()
+
         // Стронгхолды только в океане (план, раздел 3.1)
         com.thelameres.islandworld.worldgen.structure.OceanConcentricRingsPlacement.register()
 
-		// Чёрная комната (план, раздел 5)
-		com.thelameres.islandworld.worldgen.blackroom.BlackRoomChunkGenerator.register()
-		com.thelameres.islandworld.worldgen.blackroom.BlackRoomWrapAround.register()
-		com.thelameres.islandworld.worldgen.blackroom.BlackRoomProtection.register()
+        // Чёрная комната (план, раздел 5)
+        com.thelameres.islandworld.worldgen.blackroom.BlackRoomChunkGenerator.register()
+        com.thelameres.islandworld.worldgen.blackroom.BlackRoomWrapAround.register()
+        com.thelameres.islandworld.worldgen.blackroom.BlackRoomProtection.register()
 
-		// Первый вход игрока: телепорт на берег океана у (-930, 600)
-		ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
-			val player = handler.player
-			if (com.thelameres.islandworld.util.FirstJoinStore.hasJoined(server, player.uuid)) return@register
+        // Первый вход игрока: телепорт на берег океана у (-930, 600)
+        ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
+            val player = handler.player
+            if (FirstJoinStore.hasJoined(server, player.uuid)) return@register
 
             val level = server.overworld()
             val spawn = SpawnUtil.findPlayerSpawn(level)
