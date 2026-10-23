@@ -63,7 +63,7 @@ object CompassCoordinatesHud {
         } else {
             Triple(randomX, randomY, randomZ)
         }
-        val message = Component.literal("$x $y $z")
+        val message = Component.literal("$x | $y | $z")
         player.sendOverlayMessage(message)
     }
 

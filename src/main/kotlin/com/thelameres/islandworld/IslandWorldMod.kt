@@ -26,6 +26,10 @@ object IslandWorldMod : ModInitializer {
     override fun onInitialize() {
         ModDensityFunctions.register()
 
+        // LocatorBar: регистрация payload и периодическая отправка позиций игрокам с компасом
+        com.thelameres.islandworld.locator.PlayerPositionsPayload.register()
+        com.thelameres.islandworld.locator.CompassLocator.register()
+
         // Стронгхолды только в океане (план, раздел 3.1)
         com.thelameres.islandworld.worldgen.structure.OceanConcentricRingsPlacement.register()
 
