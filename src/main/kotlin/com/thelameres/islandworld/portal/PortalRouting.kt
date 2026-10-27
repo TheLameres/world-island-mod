@@ -54,7 +54,7 @@ object PortalRouting {
         val blackRoom = server.getLevel(BlackRoom.DIMENSION) ?: return null
 
         // Запоминаем портал, через который игрок вошёл, чтобы вернуть его сюда же
-        ReturnPortalStore.save(server, player.uuid, pos)
+        ReturnPortalStore.of(server).save(player.uuid, pos)
 
         val spawn = Vec3(BLACK_ROOM_ENTRY_X, BlackRoom.SPAWN_Y, BLACK_ROOM_ENTRY_Z)
         return TeleportTransition(blackRoom, spawn, Vec3.ZERO, 0f, 0f, TeleportTransition.DO_NOTHING)
@@ -75,7 +75,7 @@ object PortalRouting {
      * null — записи нет или мира Нижнего мира не существует, тогда пусть решает ваниль.
      */
     private fun exitToNether(level: ServerLevel, player: ServerPlayer): TeleportTransition? {
-        val saved = ReturnPortalStore.get(level.server, player.uuid) ?: return null
+        val saved = ReturnPortalStore.of(level.server).get(player.uuid) ?: return null
         val nether = level.server.getLevel(Level.NETHER) ?: return null
 
         // Ставим игрока по центру портала, на уровне входа
