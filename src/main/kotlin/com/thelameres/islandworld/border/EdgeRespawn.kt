@@ -3,8 +3,7 @@ package com.thelameres.islandworld.border
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.tags.BiomeTags
-import net.minecraft.tags.BlockTags
+import com.thelameres.islandworld.util.SpawnUtil
 import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.levelgen.Heightmap
 import org.slf4j.LoggerFactory
@@ -52,7 +51,7 @@ object EdgeRespawn {
 			spot.x + 0.5,
 			spot.y.toDouble(),
 			spot.z + 0.5,
-			emptySet<Relative>(),
+			emptySet(),
 			0f,
 			0f,
 			false
@@ -113,18 +112,26 @@ object EdgeRespawn {
 	}
 
 	private fun isOcean(level: ServerLevel, x: Int, z: Int): Boolean =
-		level.getBiome(BlockPos(x, level.seaLevel, z)).`is`(BiomeTags.IS_OCEAN)
+		SpawnUtil.isOceanAt(level, x, z)
 
-	/** Безопасная точка стояния: твёрдая поверхность без воды и листвы, над ней воздух. */
+	/**
+	 * Безопасная точка стоянки: опора под ногами — земля/песок/трава (те же правила, что у
+	 * стартовой точки, см. [SpawnUtil]), точка и место над головой свободны, дерева сверху нет.
+	 *
+	 * Раньше здесь принимался любой непустой блок, включая камень и гравий, — на каменистом
+	 * обрыве игрок мог оказаться на узком уступе. Теперь требования строже.
+	 *
+	 * Поиск привязан к поверхности (WORLD_SURFACE), а не к скану вниз по колонке: иначе
+	 * на обрыве можно было найти «место» в пещере под ним.
+	 */
 	private fun safeSpot(level: ServerLevel, x: Int, z: Int): BlockPos? {
 		val surface = BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1, z)
-		val ground = level.getBlockState(surface)
-		if (ground.isAir) return null
-		if (!ground.fluidState.isEmpty) return null
-		if (ground.`is`(BlockTags.LEAVES)) return null
+		if (!SpawnUtil.isGround(level.getBlockState(surface))) return null
+
 		val feet = surface.above()
-		if (!level.getBlockState(feet).isAir) return null
-		if (!level.getBlockState(feet.above()).isAir) return null
+		if (!SpawnUtil.isPassable(level, feet)) return null
+		if (!SpawnUtil.isPassable(level, feet.above())) return null
+		if (SpawnUtil.hasTreeAbove(level, feet)) return null
 		return feet
 	}
 }

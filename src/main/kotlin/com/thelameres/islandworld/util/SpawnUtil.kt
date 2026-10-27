@@ -162,12 +162,18 @@ object SpawnUtil {
 	private fun isOceanAt(level: ServerLevel, pos: BlockPos): Boolean =
 		level.getBiome(pos).`is`(BiomeTags.IS_OCEAN)
 
-	private fun isGround(state: BlockState): Boolean =
+	/** Есть ли океанский биом в колонке (x, z) на уровне моря. Общий предикат для EdgeRespawn. */
+	fun isOceanAt(level: ServerLevel, x: Int, z: Int): Boolean =
+		level.getBiome(BlockPos(x, level.seaLevel, z)).`is`(BiomeTags.IS_OCEAN)
+
+	/** Годится ли блок как опора под ногами: земля, песок или трава. */
+	fun isGround(state: BlockState): Boolean =
 		state.`is`(BlockTags.DIRT)
 			|| state.`is`(BlockTags.SAND)
 			|| state.`is`(Blocks.GRASS_BLOCK)
 
-	private fun isPassable(level: ServerLevel, pos: BlockPos): Boolean {
+	/** Свободно ли место для игрока: нет коллизии, жидкости, брёвен и листвы. */
+	fun isPassable(level: ServerLevel, pos: BlockPos): Boolean {
 		val state = level.getBlockState(pos)
 		return state.getCollisionShape(level, pos).isEmpty
 			&& level.getFluidState(pos).isEmpty
@@ -175,7 +181,8 @@ object SpawnUtil {
 			&& !state.`is`(BlockTags.LEAVES)
 	}
 
-	private fun hasTreeAbove(level: ServerLevel, feet: BlockPos): Boolean {
+	/** Есть ли ствол или листва в пределах TREE_CHECK_HEIGHT над точкой. */
+	fun hasTreeAbove(level: ServerLevel, feet: BlockPos): Boolean {
 		for (i in 1..TREE_CHECK_HEIGHT) {
 			val state = level.getBlockState(feet.above(i))
 			if (state.`is`(BlockTags.LOGS) || state.`is`(BlockTags.LEAVES)) return true
