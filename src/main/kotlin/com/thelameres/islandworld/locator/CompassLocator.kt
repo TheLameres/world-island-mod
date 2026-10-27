@@ -97,39 +97,41 @@ object CompassLocator {
             // Кэшу доверяем только если он совпадает с фактическим состоянием атрибутов.
             // Иначе (например, после респавна или пересоздания игрока) применяем заново.
             if (lastAttributeState[player.uuid] == state
-                && modifiersMatch(receiveAttr, RECEIVE_HIDDEN_ID, receiveVisible)
-                && modifiersMatch(transmitAttr, TRANSMIT_HIDDEN_ID, transmitVisible)
+                && receiveAttr.modifiersMatch(RECEIVE_HIDDEN_ID, receiveVisible)
+                && transmitAttr.modifiersMatch(TRANSMIT_HIDDEN_ID, transmitVisible)
             ) {
                 return@forEach
             }
 
-            applyModifier(receiveAttr, RECEIVE_HIDDEN_ID, receiveVisible)
-            applyModifier(transmitAttr, TRANSMIT_HIDDEN_ID, transmitVisible)
+            receiveAttr.applyModifier(RECEIVE_HIDDEN_ID, receiveVisible)
+            transmitAttr.applyModifier(TRANSMIT_HIDDEN_ID, transmitVisible)
             lastAttributeState[player.uuid] = state
         }
     }
 
-    /** true — атрибут уже в нужном состоянии: скрывающий модификатор есть/отсутствует как надо. */
-    private fun modifiersMatch(instance: AttributeInstance?, id: Identifier, visible: Boolean): Boolean {
-        instance ?: return true
-        val hasModifier = instance.getModifier(id) != null
-        // visible = true → модификатора быть не должно; visible = false → должен быть
-        return hasModifier != visible
-    }
-
-    private fun applyModifier(instance: AttributeInstance?, id: Identifier, visible: Boolean) {
-        instance ?: return
-        instance.removeModifier(id)
-        if (!visible) {
-            instance.addTransientModifier(
-                AttributeModifier(id, ZERO_MULTIPLIER, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)
-            )
-        }
-    }
 
     private fun Player.isHoldingCompass(): Boolean =
         mainHandItem.`is`(Items.COMPASS) || offhandItem.`is`(Items.COMPASS)
 
     private fun Player.isWearingPlayerHead(): Boolean =
         getItemBySlot(EquipmentSlot.HEAD).`is`(Items.PLAYER_HEAD)
+
+    /** true — атрибут уже в нужном состоянии: скрывающий модификатор есть/отсутствует как надо. */
+    private fun AttributeInstance?.modifiersMatch(id: Identifier, visible: Boolean): Boolean {
+        this ?: return true
+        val hasModifier = getModifier(id) != null
+        // visible = true → модификатора быть не должно; visible = false → должен быть
+        return hasModifier != visible
+    }
+
+    /** Ставит или снимает скрывающий модификатор: [visible] = false обнуляет диапазон. */
+    private fun AttributeInstance?.applyModifier(id: Identifier, visible: Boolean) {
+        this ?: return
+        removeModifier(id)
+        if (!visible) {
+            addTransientModifier(
+                AttributeModifier(id, ZERO_MULTIPLIER, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)
+            )
+        }
+    }
 }

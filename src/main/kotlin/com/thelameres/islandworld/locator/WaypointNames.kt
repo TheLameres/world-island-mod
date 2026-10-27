@@ -8,7 +8,7 @@ import net.minecraft.world.level.block.entity.SignTextSlot
 
 
 /**
- * Достаёт «человеческое» имя метки из самого блока.
+ * Имя waypoint-метки, извлечённое из самого блока.
  *
  * Табличка: первая непустая строка лицевой стороны.
  * Флаг: кастомное имя (BannerBlockEntity implements Nameable).
@@ -18,25 +18,22 @@ import net.minecraft.world.level.block.entity.SignTextSlot
  * и её транслируемость. Раньше значение прогонялось через String и обратно
  * в Component.literal, из-за чего оформление терялось.
  */
-object WaypointNames {
 
-    /** @JvmStatic — чтобы миксины на Java могли звать WaypointNames.resolve(...) напрямую. */
-    @JvmStatic
-    fun resolve(blockEntity: BlockEntity): Component? {
-        if (blockEntity is SignBlockEntity) {
-            val lines = blockEntity.getText(SignTextSlot.FRONT).getMessages(false)
-            for (line in lines) {
-                if (line.string.trim { it <= ' ' }.isNotEmpty()) {
-                    return line
-                }
+/** Имя метки из блока: строка таблички или кастомное имя флага. null — имени нет. */
+fun BlockEntity.waypointName(): Component? {
+    if (this is SignBlockEntity) {
+        val lines = getText(SignTextSlot.FRONT).getMessages(false)
+        for (line in lines) {
+            if (line.string.trim { it <= ' ' }.isNotEmpty()) {
+                return line
             }
         }
-        if (blockEntity is BannerBlockEntity) {
-            val custom = blockEntity.customName
-            if (custom != null && custom.string.trim { it <= ' ' }.isNotEmpty()) {
-                return custom
-            }
-        }
-        return null
     }
+    if (this is BannerBlockEntity) {
+        val custom = customName
+        if (custom != null && custom.string.trim { it <= ' ' }.isNotEmpty()) {
+            return custom
+        }
+    }
+    return null
 }

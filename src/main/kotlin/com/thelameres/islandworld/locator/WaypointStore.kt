@@ -113,7 +113,7 @@ class WaypointStore : SavedData() {
 
         private val TYPE: SavedDataType<WaypointStore> = SavedDataType(
             IslandWorldMod.id("waypoints"),
-            Supplier { WaypointStore() },
+            ::WaypointStore,
             CODEC,
             // DFU-тип нужен только для миграции; своя схема у нас стабильная,
             // поэтому берём нейтральный SAVED_DATA_COMMAND_STORAGE.

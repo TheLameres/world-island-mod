@@ -36,7 +36,7 @@ object WaypointChunkHooks {
         if (!store.contains(pos)) return
 
         // Имя перечитываем из блока: табличку могли переименовать, пока чанк был выгружен
-        val waypoint = store.upsert(pos, WaypointNames.resolve(blockEntity)?.string)
+        val waypoint = store.upsert(pos, blockEntity.waypointName()?.string)
         level.waypointManager.trackWaypoint(waypoint)
     }
 

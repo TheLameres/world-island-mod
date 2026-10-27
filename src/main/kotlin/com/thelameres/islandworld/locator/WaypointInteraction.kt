@@ -91,7 +91,7 @@ object WaypointInteraction {
             return
         }
 
-        val name = WaypointNames.resolve(blockEntity)?.string
+        val name = blockEntity.waypointName()?.string
         val waypoint = store.upsert(pos, name)
         level.waypointManager.trackWaypoint(waypoint)
 
@@ -111,7 +111,7 @@ object WaypointInteraction {
      * иначе переводимая заглушка с координатами.
      */
     private fun displayName(blockEntity: BlockEntity): Component {
-        WaypointNames.resolve(blockEntity)?.let { return it }
+        blockEntity.waypointName()?.let { return it }
 
         val pos = blockEntity.blockPos
         return Component.translatable(KEY_DEFAULT_NAME, pos.x, pos.y, pos.z)

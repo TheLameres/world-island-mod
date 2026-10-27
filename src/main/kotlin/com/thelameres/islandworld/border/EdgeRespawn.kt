@@ -1,9 +1,13 @@
 package com.thelameres.islandworld.border
 
-import net.minecraft.core.BlockPos
+import com.thelameres.islandworld.util.findSpawnInColumn
+import com.thelameres.islandworld.util.hasTreeAbove
+import com.thelameres.islandworld.util.isGround
+import com.thelameres.islandworld.util.isOceanAt
+import com.thelameres.islandworld.util.isPassable
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerPlayer
-import com.thelameres.islandworld.util.SpawnUtil
 import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.levelgen.Heightmap
 import org.slf4j.LoggerFactory
@@ -51,7 +55,7 @@ object EdgeRespawn {
 			spot.x + 0.5,
 			spot.y.toDouble(),
 			spot.z + 0.5,
-			emptySet(),
+			emptySet<Relative>(),
 			0f,
 			0f,
 			false
@@ -76,7 +80,10 @@ object EdgeRespawn {
 		return null
 	}
 
-	/** Идём от maxRadius к центру по лучу; первая подходящая точка и есть край острова в этом направлении. */
+	/**
+	 * Идём от maxRadius к центру по лучу; первая подходящая точка и есть край острова
+	 * в этом направлении.
+	 */
 	private fun findOnRay(
 		level: ServerLevel,
 		angle: Double,
@@ -91,8 +98,8 @@ object EdgeRespawn {
 		while (r >= 0) {
 			val x = floor(cx + dx * r).toInt()
 			val z = floor(cz + dz * r).toInt()
-			if (!isOcean(level, x, z) && isCoast(level, x, z, dx, dz, coastRadius)) {
-				safeSpot(level, x, z)?.let { return it }
+			if (!level.isOceanAt(x, z) && level.isCoast(x, z, dx, dz, coastRadius)) {
+				level.safeSpot(x, z)?.let { return it }
 			}
 			r -= RAY_STEP
 		}
@@ -100,23 +107,20 @@ object EdgeRespawn {
 	}
 
 	/** Есть ли океан в пределах coastRadius за точкой по лучу. */
-	private fun isCoast(level: ServerLevel, x: Int, z: Int, dx: Double, dz: Double, coastRadius: Int): Boolean {
+	private fun ServerLevel.isCoast(x: Int, z: Int, dx: Double, dz: Double, coastRadius: Int): Boolean {
 		var d = RAY_STEP
 		while (d <= coastRadius) {
 			val ox = floor(x + 0.5 + dx * d).toInt()
 			val oz = floor(z + 0.5 + dz * d).toInt()
-			if (isOcean(level, ox, oz)) return true
+			if (isOceanAt(ox, oz)) return true
 			d += RAY_STEP
 		}
 		return false
 	}
 
-	private fun isOcean(level: ServerLevel, x: Int, z: Int): Boolean =
-		SpawnUtil.isOceanAt(level, x, z)
-
 	/**
 	 * Безопасная точка стоянки: опора под ногами — земля/песок/трава (те же правила, что у
-	 * стартовой точки, см. [SpawnUtil]), точка и место над головой свободны, дерева сверху нет.
+	 * стартовой точки, см. LevelPredicates), точка и место над головой свободны, дерева сверху нет.
 	 *
 	 * Раньше здесь принимался любой непустой блок, включая камень и гравий, — на каменистом
 	 * обрыве игрок мог оказаться на узком уступе. Теперь требования строже.
@@ -124,14 +128,14 @@ object EdgeRespawn {
 	 * Поиск привязан к поверхности (WORLD_SURFACE), а не к скану вниз по колонке: иначе
 	 * на обрыве можно было найти «место» в пещере под ним.
 	 */
-	private fun safeSpot(level: ServerLevel, x: Int, z: Int): BlockPos? {
-		val surface = BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1, z)
-		if (!SpawnUtil.isGround(level.getBlockState(surface))) return null
+	private fun ServerLevel.safeSpot(x: Int, z: Int): BlockPos? {
+		val surface = BlockPos(x, getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1, z)
+		if (!getBlockState(surface).isGround()) return null
 
 		val feet = surface.above()
-		if (!SpawnUtil.isPassable(level, feet)) return null
-		if (!SpawnUtil.isPassable(level, feet.above())) return null
-		if (SpawnUtil.hasTreeAbove(level, feet)) return null
+		if (!isPassable(feet)) return null
+		if (!isPassable(feet.above())) return null
+		if (hasTreeAbove(feet)) return null
 		return feet
 	}
 }

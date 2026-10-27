@@ -75,7 +75,7 @@ class ReturnPortalStore : SavedData() {
 
         private val TYPE: SavedDataType<ReturnPortalStore> = SavedDataType(
             IslandWorldMod.id("return_portals"),
-            Supplier { ReturnPortalStore() },
+            ::ReturnPortalStore,
             CODEC,
             // DFU-тип нужен только для миграции; своя схема у нас стабильная,
             // поэтому берём нейтральный SAVED_DATA_COMMAND_STORAGE.
