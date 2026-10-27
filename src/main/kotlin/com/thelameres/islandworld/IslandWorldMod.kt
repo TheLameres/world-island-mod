@@ -4,6 +4,7 @@ import com.thelameres.islandworld.border.BoundaryManager
 import com.thelameres.islandworld.border.BoundaryManager.onDisconnect
 import com.thelameres.islandworld.border.EdgeRespawn
 import com.thelameres.islandworld.border.IslandConfigLoader
+import com.thelameres.islandworld.locator.CompassLocator
 import com.thelameres.islandworld.locator.WaypointInteraction
 import com.thelameres.islandworld.locator.WaypointStore
 import com.thelameres.islandworld.util.FirstJoinStore
@@ -90,6 +91,9 @@ object IslandWorldMod : ModInitializer {
         ServerPlayerEvents.AFTER_RESPAWN.register { oldPlayer, newPlayer, _ ->
             BoundaryManager.onRespawn(newPlayer.uuid)
             EdgeRespawn.handleRespawn(newPlayer)
+            // После смерти это новый ServerPlayer без наших временных модификаторов атрибутов,
+            // поэтому кэш LocatorBar надо сбросить — иначе останутся точки на баре
+            CompassLocator.onRespawn(newPlayer)
         }
 
         LOGGER.info("Island World initialised (worldgen stage 1, boundary 2000)")

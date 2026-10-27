@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.resources.Identifier
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.ai.attributes.AttributeInstance
 import net.minecraft.world.entity.ai.attributes.AttributeModifier
@@ -22,6 +23,18 @@ import java.util.*
  *
  * Своего HUD и сетевого канала у мода нет: список игроков строит движок
  * из атрибутов, отрисовывает ваниль.
+ *
+ * ВАЖНО про респавн: при смерти создаётся НОВЫЙ объект ServerPlayer, а
+ * `ServerPlayer.restoreFrom` переносит только базовые значения
+ * (`AttributeMap.assignBaseValues`) и постоянные модификаторы
+ * (`assignPermanentModifiers`). Временные модификаторы
+ * (`addTransientModifier`), которыми мы обнуляем диапазоны, НЕ переносятся.
+ * Поэтому после смерти у нового игрока атрибуты девственно чистые, а
+ * `lastAttributeState` помнит старое состояние по UUID и считает, что
+ * применять нечего. Отсюда и «залипший» LocatorBar с точками.
+ *
+ * Лечится двумя вещами: сбрасывать кэш при респавне и не доверять кэшу,
+ * а сверяться с фактическим наличием модификатора на атрибуте.
  */
 object CompassLocator {
 
@@ -33,7 +46,10 @@ object CompassLocator {
     /** ADD_MULTIPLIED_TOTAL с -1 даёт итоговое значение 0: значение *= (1 + (-1)). */
     private const val ZERO_MULTIPLIER = -1.0
 
-    /** Последнее применённое состояние атрибутов (receive, transmit) по UUID. */
+    /**
+     * Последнее применённое состояние атрибутов (receive, transmit) по UUID.
+     * Кэш нужен, чтобы не трогать атрибуты каждый тик: их изменение рассылается клиентам.
+     */
     private val lastAttributeState: MutableMap<UUID, Pair<Boolean, Boolean>> = mutableMapOf()
 
     fun register() {
@@ -46,7 +62,19 @@ object CompassLocator {
         }
     }
 
-    /** Атрибуты нативного LocatorBar: обходим всех игроков сервера, включая тех, кто в PLAYER_HEAD. */
+    /**
+     * Сброс кэша при респавне: после смерти это новый объект игрока, и его атрибуты
+     * не содержат наших временных модификаторов, даже если кэш помнит обратное.
+     * Без сброса состояние «был с компасом» сохранялось бы, и бар оставался видимым.
+     */
+    fun onRespawn(player: ServerPlayer) {
+        lastAttributeState.remove(player.uuid)
+    }
+
+    /**
+     * Атрибуты нативного LocatorBar: обходим всех игроков сервера, включая тех,
+     * кто в PLAYER_HEAD.
+     */
     private fun syncWaypointAttributes(server: MinecraftServer) {
         val players = server.playerList.players
         lastAttributeState.keys.retainAll(players.map { it.uuid }.toSet())
@@ -56,12 +84,30 @@ object CompassLocator {
             val transmitVisible = !player.isWearingPlayerHead()
             val state = receiveVisible to transmitVisible
 
-            if (lastAttributeState[player.uuid] == state) return@forEach
+            val receiveAttr = player.getAttribute(Attributes.WAYPOINT_RECEIVE_RANGE)
+            val transmitAttr = player.getAttribute(Attributes.WAYPOINT_TRANSMIT_RANGE)
 
-            applyModifier(player.getAttribute(Attributes.WAYPOINT_RECEIVE_RANGE), RECEIVE_HIDDEN_ID, receiveVisible)
-            applyModifier(player.getAttribute(Attributes.WAYPOINT_TRANSMIT_RANGE), TRANSMIT_HIDDEN_ID, transmitVisible)
+            // Кэшу доверяем только если он совпадает с фактическим состоянием атрибутов.
+            // Иначе (например, после респавна или пересоздания игрока) применяем заново.
+            if (lastAttributeState[player.uuid] == state
+                && modifiersMatch(receiveAttr, RECEIVE_HIDDEN_ID, receiveVisible)
+                && modifiersMatch(transmitAttr, TRANSMIT_HIDDEN_ID, transmitVisible)
+            ) {
+                return@forEach
+            }
+
+            applyModifier(receiveAttr, RECEIVE_HIDDEN_ID, receiveVisible)
+            applyModifier(transmitAttr, TRANSMIT_HIDDEN_ID, transmitVisible)
             lastAttributeState[player.uuid] = state
         }
+    }
+
+    /** true — атрибут уже в нужном состоянии: скрывающий модификатор есть/отсутствует как надо. */
+    private fun modifiersMatch(instance: AttributeInstance?, id: Identifier, visible: Boolean): Boolean {
+        instance ?: return true
+        val hasModifier = instance.getModifier(id) != null
+        // visible = true → модификатора быть не должно; visible = false → должен быть
+        return hasModifier != visible
     }
 
     private fun applyModifier(instance: AttributeInstance?, id: Identifier, visible: Boolean) {

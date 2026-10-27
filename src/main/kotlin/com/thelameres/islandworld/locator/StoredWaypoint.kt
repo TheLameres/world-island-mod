@@ -56,7 +56,7 @@ class StoredWaypoint internal constructor(
     }
 
     override fun makeWaypointConnectionWith(receiver: ServerPlayer): Optional<WaypointTransmitter.Connection> {
-        if (!isTransmittingWaypoint()) {
+        if (!isTransmittingWaypoint) {
             return Optional.empty()
         }
         // Далёкие чанки не грузим: для незагруженного чанка отправляем метку уровнем чанка,
