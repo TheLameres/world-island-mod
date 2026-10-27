@@ -10,16 +10,16 @@ import java.util.*
 
 
 /**
- * Waypoint-передатчик, живущий в [WaypointRegistry], а не в блок-энтити.
+ * Waypoint-передатчик, живущий в [WaypointStore], а не в блок-энтити.
  *
  * Зачем отдельный объект: при выгрузке чанка BlockEntity уничтожается
  * (ServerLevel.unload → LevelChunk.clearAllBlockEntities), поэтому табличка не может
- * оставаться передатчиком. Реестр живёт в SavedData уровня, значит точка продолжает
+ * оставаться передатчиком. Хранилище живёт в SavedData уровня, значит точка продолжает
  * висеть в WaypointManager и после выгрузки чанка — игрок видит метку на компасе,
  * даже если блок сейчас не загружен.
  */
-class RegistryWaypoint internal constructor(
-    private val registry: WaypointRegistry,
+class StoredWaypoint internal constructor(
+    private val store: WaypointStore,
     private val pointId: UUID,
     @Volatile internal var position: BlockPos,
     @Volatile internal var name: String?,
@@ -58,9 +58,9 @@ class RegistryWaypoint internal constructor(
         this.position = newPosition
     }
 
-    /** Метка «передаётся», пока она есть в реестре: так отключение снимает её у всех игроков. */
+    /** Метка «передаётся», пока она есть в хранилище: так отключение снимает её у всех игроков. */
     override fun isTransmittingWaypoint(): Boolean {
-        return registry.contains(pointId)
+        return store.contains(pointId)
     }
 
     override fun waypointIcon(): Waypoint.Icon {
@@ -68,7 +68,7 @@ class RegistryWaypoint internal constructor(
     }
 
     override fun makeWaypointConnectionWith(receiver: ServerPlayer): Optional<WaypointTransmitter.Connection> {
-        if (!isTransmittingWaypoint()) {
+        if (!isTransmittingWaypoint) {
             return Optional.empty()
         }
         // Далёкие чанки не грузим: для незагруженного чанка отправляем метку уровнем чанка,

@@ -11,11 +11,11 @@ import java.util.*
  * Состояние waypoint-метки, привязанное к конкретной табличке/флагу.
  * Живёт в @Unique-поле миксина; здесь только данные и сериализация.
  *
- * Передатчиком для менеджера этот класс НЕ является — см. [RegistryWaypoint].
+ * Передатчиком для менеджера этот класс НЕ является — см. [StoredWaypoint].
  * Здесь хранится «паспорт» точки: включена ли она, её UUID, имя и цвет.
  *
  * Позицию не держим: она всегда известна из blockEntity.blockPos, а передатчик
- * [RegistryWaypoint] хранит свою копию.
+ * [StoredWaypoint] хранит свою копию.
  */
 class BlockWaypointState(
     var isEnabled: Boolean = false,
@@ -56,7 +56,7 @@ class BlockWaypointState(
 
     /**
      * Загрузка состояния. Вызывается миксином из loadAdditional до того, как
-     * LevelChunk.setBlockEntity восстановит точку в реестре, поэтому isEnabled
+     * LevelChunk.setBlockEntity восстановит точку в хранилище, поэтому isEnabled
      * успевает прочитаться раньше, чем произойдёт trackWaypoint.
      */
     fun readFrom(input: ValueInput) {
@@ -83,7 +83,7 @@ class BlockWaypointState(
     }
 
     /**
-     * Включает/выключает метку. Вызывающий сам синхронизирует реестр
+     * Включает/выключает метку. Вызывающий сам синхронизирует хранилище
      * и делает trackWaypoint/untrackWaypoint на ServerWaypointManager.
      *
      * Возвращает Boolean не «на будущее», а чтобы JVM-сигнатура отличалась от

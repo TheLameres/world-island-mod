@@ -2,8 +2,8 @@ package com.thelameres.islandworld.mixin;
 
 import com.thelameres.islandworld.locator.BlockWaypointState;
 import com.thelameres.islandworld.locator.BlockWaypointTransmitter;
-import com.thelameres.islandworld.locator.RegistryWaypoint;
-import com.thelameres.islandworld.locator.WaypointRegistry;
+import com.thelameres.islandworld.locator.StoredWaypoint;
+import com.thelameres.islandworld.locator.WaypointStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -14,9 +14,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Синхронизация блок-энтitей с постоянным реестром waypoint-меток.
+ * Синхронизация блок-энтitей с постоянным хранилищем waypoint-меток.
  *
- * Ключевое правило: точка живёт в {@link WaypointRegistry} (SavedData уровня), а не в
+ * Ключевое правило: точка живёт в {@link WaypointStore} (SavedData уровня), а не в
  * BlockEntity. Поэтому:
  *  - уничтожение блока (removeBlockEntity) — точку удаляем и снимаем с менеджера;
  *  - выгрузка чанка (clearAllBlockEntities) — НИЧЕГО не делаем, точка остаётся на карте;
@@ -37,8 +37,8 @@ public abstract class MixinLevelChunkWaypoint {
 
         // upsert идемпотентен: после повторной загрузки чанка вернётся тот же передатчик,
         // и метка на клиенте сохранит свой UUID (без мигания «удалить/добавить»).
-        WaypointRegistry registry = WaypointRegistry.of(serverLevel);
-        RegistryWaypoint waypoint = registry.upsert(
+        WaypointStore store = WaypointStore.of(serverLevel);
+        StoredWaypoint waypoint = store.upsert(
                 state.id(),
                 blockEntity.getBlockPos(),
                 state.nameOrNull(),
@@ -62,8 +62,8 @@ public abstract class MixinLevelChunkWaypoint {
         BlockWaypointState state = transmitter.islandworld$waypointState();
         if (!state.isEnabled()) return;
 
-        WaypointRegistry registry = WaypointRegistry.of(serverLevel);
-        RegistryWaypoint removed = registry.remove(state.id());
+        WaypointStore store = WaypointStore.of(serverLevel);
+        StoredWaypoint removed = store.remove(state.id());
         if (removed != null) {
             serverLevel.getWaypointManager().untrackWaypoint(removed);
         }

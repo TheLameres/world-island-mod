@@ -2,12 +2,12 @@ package com.thelameres.islandworld.locator
 
 
 /**
- * Контракт для блок-энтitей, которые умеют быть waypoint-метками.
+ * Контракт для блок-энтитей, которые умеют быть waypoint-метками.
  *
  * ВАЖНО: сам BlockEntity больше НЕ является WaypointTransmitter. При выгрузке чанка
  * BlockEntity уничтожается (ServerLevel.unload → LevelChunk.clearAllBlockEntities),
- * поэтому передатчиком служит [RegistryWaypoint] из [WaypointRegistry], живущий вне чанка.
- * Блок-энтити лишь хранит своё состояние и сообщает о нём реестру.
+ * поэтому передатчиком служит [StoredWaypoint] из [WaypointStore], живущий вне чанка.
+ * Блок-энтити лишь хранит своё состояние и сообщает о нём хранилищу.
  */
 interface BlockWaypointTransmitter {
     fun `islandworld$waypointState`(): BlockWaypointState

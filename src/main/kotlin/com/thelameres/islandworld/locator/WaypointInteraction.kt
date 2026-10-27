@@ -81,12 +81,12 @@ object WaypointInteraction {
         level: ServerLevel,
         state: BlockWaypointState, blockEntity: BlockEntity, player: ServerPlayer
     ) {
-        val registry = WaypointRegistry.of(level)
+        val store = WaypointStore.of(level)
 
         if (state.isEnabled) {
-            // Снимаем и с реестра (чтобы точка не воскресла после выгрузки/перезагрузки),
+            // Снимаем и с хранилища (чтобы точка не воскресла после выгрузки/перезагрузки),
             // и с менеджера, чтобы у игроков сразу пропала метка
-            registry.remove(state.id())?.let { removed -> level.waypointManager.untrackWaypoint(removed) }
+            store.remove(state.id())?.let { removed -> level.waypointManager.untrackWaypoint(removed) }
             state.setEnabled(false)
             blockEntity.setChanged()
             player.sendSystemMessage(
@@ -102,7 +102,7 @@ object WaypointInteraction {
         state.setEnabled(true)
         blockEntity.setChanged()
 
-        val waypoint = registry.upsert(
+        val waypoint = store.upsert(
             state.id(),
             blockEntity.blockPos,
             state.nameOrNull(),

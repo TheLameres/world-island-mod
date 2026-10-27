@@ -14,11 +14,11 @@ import java.util.function.Supplier
 
 
 /**
- * Постоянный реестр waypoint-меток уровня.
+ * Постоянное хранилище waypoint-меток уровня.
  *
  * Хранится в SavedData (data/islandworld_waypoints.dat), поэтому метки переживают
- * выгрузку чанка, перезагрузку мира и рестарт сервера. Именно реестр держит
- * [RegistryWaypoint] в WaypointManager — блок-энтити при выгрузке чанка уничтожается
+ * выгрузку чанка, перезагрузку мира и рестарт сервера. Именно хранилище держит
+ * [StoredWaypoint] в WaypointManager — блок-энтити при выгрузке чанка уничтожается
  * и передатчиком быть не может.
  *
  * Жизненный цикл:
@@ -27,27 +27,19 @@ import java.util.function.Supplier
  *  - чанк загружен (LevelChunk.setBlockEntity)   → upsert() + trackWaypoint (идемпотентно);
  *  - сервер стартовал                            → attach() возвращает точки в менеджер.
  */
-class WaypointRegistry : SavedData() {
+class WaypointStore : SavedData() {
 
-    private val points: MutableMap<UUID, RegistryWaypoint> = LinkedHashMap()
+    private val points: MutableMap<UUID, StoredWaypoint> = LinkedHashMap()
 
     fun contains(id: UUID): Boolean {
         return points.containsKey(id)
-    }
-
-    fun get(id: UUID): RegistryWaypoint? {
-        return points[id]
-    }
-
-    fun all(): Collection<RegistryWaypoint> {
-        return points.values.toList()
     }
 
     /**
      * Создаёт или обновляет точку. Возвращает живой передатчик — его и надо отдавать
      * в WaypointManager.trackWaypoint.
      */
-    fun upsert(id: UUID, pos: BlockPos, name: String?, colorRgb: Int?): RegistryWaypoint {
+    fun upsert(id: UUID, pos: BlockPos, name: String?, colorRgb: Int?): StoredWaypoint {
         val existing = points[id]
         if (existing != null) {
             val moved = existing.position != pos
@@ -59,14 +51,14 @@ class WaypointRegistry : SavedData() {
             return existing
         }
 
-        val created = RegistryWaypoint(this, id, pos, name, colorRgb)
+        val created = StoredWaypoint(this, id, pos, name, colorRgb)
         points[id] = created
         setDirty()
         return created
     }
 
     /** Удаляет точку; возвращает её передатчик, чтобы вызывающий снял его с менеджера. */
-    fun remove(id: UUID): RegistryWaypoint? {
+    fun remove(id: UUID): StoredWaypoint? {
         val removed = points.remove(id)
         if (removed != null) {
             setDirty()
@@ -76,7 +68,7 @@ class WaypointRegistry : SavedData() {
 
     /**
      * Возвращает все точки уровня в WaypointManager. Нужно после старта сервера и
-     * после загрузки реестра с диска: менеджер создаётся заново и про точки не знает.
+     * после загрузки хранилища с диска: менеджер создаётся заново и про точки не знает.
      */
     fun attach(level: ServerLevel) {
         for (point in points.values) {
@@ -103,20 +95,20 @@ class WaypointRegistry : SavedData() {
     }
 
     companion object {
-        private val CODEC: Codec<WaypointRegistry> =
-            CompoundTag.CODEC.xmap({ tag -> ofTag(tag) }, { registry -> registry.toTag() })
+        private val CODEC: Codec<WaypointStore> =
+            CompoundTag.CODEC.xmap({ tag -> ofTag(tag) }, { store -> store.toTag() })
 
-        private val TYPE: SavedDataType<WaypointRegistry> = SavedDataType(
+        private val TYPE: SavedDataType<WaypointStore> = SavedDataType(
             Identifier.fromNamespaceAndPath("islandworld", "waypoints"),
-            Supplier { WaypointRegistry() },
+            Supplier { WaypointStore() },
             CODEC,
             // DFU-тип нужен только для миграции; своя схема у нас стабильная,
             // поэтому берём нейтральный SAVED_DATA_COMMAND_STORAGE.
             DataFixTypes.SAVED_DATA_COMMAND_STORAGE
         )
 
-        private fun ofTag(tag: CompoundTag): WaypointRegistry {
-            val registry = WaypointRegistry()
+        private fun ofTag(tag: CompoundTag): WaypointStore {
+            val store = WaypointStore()
             for (entry in tag.getListOrEmpty("points").compoundStream().toList()) {
                 val rawId = entry.getStringOr("id", "")
                 if (rawId.isEmpty()) continue
@@ -130,19 +122,19 @@ class WaypointRegistry : SavedData() {
 
                 val packedPos = entry.getLong("pos").orElse(null) ?: continue
 
-                registry.points[id] = RegistryWaypoint(
-                    registry,
+                store.points[id] = StoredWaypoint(
+                    store,
                     id,
                     BlockPos.of(packedPos),
                     entry.getString("name").orElse(null),
                     entry.getInt("color").orElse(null)
                 )
             }
-            return registry
+            return store
         }
 
         @JvmStatic
-        fun of(level: ServerLevel): WaypointRegistry {
+        fun of(level: ServerLevel): WaypointStore {
             return level.dataStorage.computeIfAbsent(TYPE)
         }
     }
