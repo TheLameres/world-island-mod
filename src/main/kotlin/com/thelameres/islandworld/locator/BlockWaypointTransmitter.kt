@@ -2,13 +2,16 @@ package com.thelameres.islandworld.locator
 
 
 /**
- * Контракт для блок-энтитей, которые умеют быть waypoint-метками.
+ * Маркерный контракт: «этот блок-энтitи может нести waypoint-метку».
  *
- * ВАЖНО: сам BlockEntity больше НЕ является WaypointTransmitter. При выгрузке чанка
- * BlockEntity уничтожается (ServerLevel.unload → LevelChunk.clearAllBlockEntities),
- * поэтому передатчиком служит [StoredWaypoint] из [WaypointStore], живущий вне чанка.
- * Блок-энтити лишь хранит своё состояние и сообщает о нём хранилищу.
+ * Сам BlockEntity не является WaypointTransmitter: при выгрузке чанка он уничтожается
+ * (ServerLevel.unload → LevelChunk.clearAllBlockEntities), поэтому передатчиком служит
+ * [StoredWaypoint] из [WaypointStore], живущий вне чанка.
+ *
+ * Состояние метки в блок-энтitи не хранится вообще — ни полем, ни в NBT. Источник
+ * истины один: наличие координаты блока в [WaypointStore]. Интерфейс нужен только
+ * чтобы отличить подходящий блок от прочих: у SignBlockEntity и BannerBlockEntity
+ * нет общего предка кроме BlockEntity, и HangingSignBlockEntity наследует
+ * SignBlockEntity, так что проверка покрывает и висячие таблички.
  */
-interface BlockWaypointTransmitter {
-    fun `islandworld$waypointState`(): BlockWaypointState
-}
+interface BlockWaypointTransmitter

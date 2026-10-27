@@ -16,10 +16,18 @@ import java.util.function.Supplier
 /**
  * Постоянное хранилище waypoint-меток уровня.
  *
+ * Ключ — [BlockPos]. Именно позиция является идентичностью метки: присутствие
+ * координаты в хранилище И ЕСТЬ признак того, что на этом месте стоит метка.
+ * Поэтому NBT-теги на табличках/флагах не нужны вовсе.
+ *
+ * Почему не по UUID: UUID приходилось бы хранить в блок-энтitи, а копирование
+ * блока (Ctrl+средняя кнопка в креативе, structure block, /setblock с NBT)
+ * переносит block entity data вместе с блоком. Копия получила бы тот же UUID,
+ * и `upsert` перенёс бы существующую метку на новое место — исходная исчезла бы.
+ * Позиция уникальна по определению, дубликат получить нельзя.
+ *
  * Хранится в SavedData (data/islandworld_waypoints.dat), поэтому метки переживают
- * выгрузку чанка, перезагрузку мира и рестарт сервера. Именно хранилище держит
- * [StoredWaypoint] в WaypointManager — блок-энтити при выгрузке чанка уничтожается
- * и передатчиком быть не может.
+ * выгрузку чанка, перезагрузку мира и рестарт сервера.
  *
  * Жизненный цикл:
  *  - блок уничтожен (LevelChunk.removeBlockEntity) → remove() + untrackWaypoint;
@@ -29,37 +37,42 @@ import java.util.function.Supplier
  */
 class WaypointStore : SavedData() {
 
-    private val points: MutableMap<UUID, StoredWaypoint> = LinkedHashMap()
+    private val points: MutableMap<BlockPos, StoredWaypoint> = LinkedHashMap()
 
-    fun contains(id: UUID): Boolean {
-        return points.containsKey(id)
+    fun contains(pos: BlockPos): Boolean {
+        return points.containsKey(pos)
+    }
+
+    fun get(pos: BlockPos): StoredWaypoint? {
+        return points[pos]
     }
 
     /**
-     * Создаёт или обновляет точку. Возвращает живой передатчик — его и надо отдавать
-     * в WaypointManager.trackWaypoint.
+     * Создаёт или обновляет точку на заданной позиции. Возвращает живой передатчик —
+     * его и надо отдавать в WaypointManager.trackWaypoint.
+     *
+     * Идемпотентен: повторный вызов с той же позицией вернёт тот же объект и тот же UUID,
+     * поэтому после перезагрузки чанка метка на клиенте не мигает.
      */
-    fun upsert(id: UUID, pos: BlockPos, name: String?, colorRgb: Int?): StoredWaypoint {
-        val existing = points[id]
+    fun upsert(pos: BlockPos, name: String?): StoredWaypoint {
+        val existing = points[pos]
         if (existing != null) {
-            val moved = existing.position != pos
-            existing.moveTo(pos)
-            existing.update(name, colorRgb)
-            if (moved || existing.name() != name || existing.color() != colorRgb) {
+            if (existing.name() != name) {
+                existing.updateName(name)
                 setDirty()
             }
             return existing
         }
 
-        val created = StoredWaypoint(this, id, pos, name, colorRgb)
-        points[id] = created
+        val created = StoredWaypoint(this, UUID.randomUUID(), pos, name)
+        points[pos] = created
         setDirty()
         return created
     }
 
     /** Удаляет точку; возвращает её передатчик, чтобы вызывающий снял его с менеджера. */
-    fun remove(id: UUID): StoredWaypoint? {
-        val removed = points.remove(id)
+    fun remove(pos: BlockPos): StoredWaypoint? {
+        val removed = points.remove(pos)
         if (removed != null) {
             setDirty()
         }
@@ -67,8 +80,8 @@ class WaypointStore : SavedData() {
     }
 
     /**
-     * Возвращает все точки уровня в WaypointManager. Нужно после старта сервера и
-     * после загрузки хранилища с диска: менеджер создаётся заново и про точки не знает.
+     * Возвращает все точки уровня в WaypointManager. Нужно после старта сервера:
+     * менеджер создаётся заново и про точки не знает.
      */
     fun attach(level: ServerLevel) {
         for (point in points.values) {
@@ -82,11 +95,10 @@ class WaypointStore : SavedData() {
         val list = ListTag()
         for (point in points.values) {
             val entry = CompoundTag()
-            entry.putString("id", point.id().toString())
             // BlockPos упаковывается в long: компактнее трёх int и не зависит от версии схемы
             entry.putLong("pos", point.position.asLong())
+            entry.putString("id", point.id().toString())
             point.name()?.let { entry.putString("name", it) }
-            point.color()?.let { entry.putInt("color", it) }
             list.addAndUnwrap(entry)
         }
         val root = CompoundTag()
@@ -110,24 +122,26 @@ class WaypointStore : SavedData() {
         private fun ofTag(tag: CompoundTag): WaypointStore {
             val store = WaypointStore()
             for (entry in tag.getListOrEmpty("points").compoundStream().toList()) {
-                val rawId = entry.getStringOr("id", "")
-                if (rawId.isEmpty()) continue
+                val packedPos = entry.getLong("pos").orElse(null) ?: continue
+                val pos = BlockPos.of(packedPos)
 
-                val id = try {
-                    UUID.fromString(rawId)
-                } catch (e: IllegalArgumentException) {
-                    // Битые данные не должны ронять загрузку уровня — просто пропускаем точку
-                    continue
+                // Битые данные не должны ронять загрузку уровня — просто пропускаем точку
+                val rawId = entry.getStringOr("id", "")
+                val id = if (rawId.isEmpty()) {
+                    UUID.randomUUID()
+                } else {
+                    try {
+                        UUID.fromString(rawId)
+                    } catch (e: IllegalArgumentException) {
+                        UUID.randomUUID()
+                    }
                 }
 
-                val packedPos = entry.getLong("pos").orElse(null) ?: continue
-
-                store.points[id] = StoredWaypoint(
+                store.points[pos] = StoredWaypoint(
                     store,
                     id,
-                    BlockPos.of(packedPos),
-                    entry.getString("name").orElse(null),
-                    entry.getInt("color").orElse(null)
+                    pos,
+                    entry.getString("name").orElse(null)
                 )
             }
             return store

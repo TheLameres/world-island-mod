@@ -10,10 +10,7 @@ import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.Level
-import net.minecraft.world.level.block.entity.BannerBlockEntity
 import net.minecraft.world.level.block.entity.BlockEntity
-import net.minecraft.world.level.block.entity.SignBlockEntity
-import net.minecraft.world.level.block.entity.SignTextSlot
 import net.minecraft.world.phys.BlockHitResult
 
 /**
@@ -23,6 +20,9 @@ import net.minecraft.world.phys.BlockHitResult
  * - требуется компас в руке, которой кликнули;
  * - обычный ПКМ по табличке без Shift не перехватывается, чтобы не ломать ванильное редактирование;
  * - повторный Shift+ПКМ по той же точке снимает метку.
+ *
+ * Источник истины о том, включена ли метка, — [WaypointStore]: наличие позиции блока
+ * в хранилище. В блок-энтitи ничего не пишется.
  *
  * Все сообщения отправляются как Component.translatable: клиент сам подставит текст
  * из assets/islandworld/lang/<locale>.json, поэтому строки не зашиты в код.
@@ -72,49 +72,33 @@ object WaypointInteraction {
             return InteractionResult.PASS
         }
 
-        val state: BlockWaypointState = blockEntity.`islandworld$waypointState`()
-        toggle(level, state, blockEntity, player)
+        toggle(level, blockEntity, player)
         return InteractionResult.SUCCESS_SERVER
     }
 
-    private fun toggle(
-        level: ServerLevel,
-        state: BlockWaypointState, blockEntity: BlockEntity, player: ServerPlayer
-    ) {
+    private fun toggle(level: ServerLevel, blockEntity: BlockEntity, player: ServerPlayer) {
         val store = WaypointStore.of(level)
+        val pos = blockEntity.blockPos
 
-        if (state.isEnabled) {
-            // Снимаем и с хранилища (чтобы точка не воскресла после выгрузки/перезагрузки),
+        if (store.contains(pos)) {
+            // Снимаем с хранилища (чтобы точка не воскресла после выгрузки/перезагрузки)
             // и с менеджера, чтобы у игроков сразу пропала метка
-            store.remove(state.id())?.let { removed -> level.waypointManager.untrackWaypoint(removed) }
-            state.setEnabled(false)
-            blockEntity.setChanged()
+            store.remove(pos)?.let { removed -> level.waypointManager.untrackWaypoint(removed) }
             player.sendSystemMessage(
-                Component.translatable(KEY_REMOVED, displayName(state, blockEntity))
+                Component.translatable(KEY_REMOVED, displayName(blockEntity))
                     .withStyle(ChatFormatting.GRAY)
             )
             return
         }
 
-        // В state храним только «плоское» имя для сравнения; в чат уходит Component,
-        // чтобы безымянная точка тоже локализовалась на клиенте.
-        state.name = resolveName(blockEntity)?.string
-        state.setEnabled(true)
-        blockEntity.setChanged()
-
-        val waypoint = store.upsert(
-            state.id(),
-            blockEntity.blockPos,
-            state.nameOrNull(),
-            state.getColorRgb()
-        )
+        val name = WaypointNames.resolve(blockEntity)?.string
+        val waypoint = store.upsert(pos, name)
         level.waypointManager.trackWaypoint(waypoint)
 
-        val pos = blockEntity.blockPos
         player.sendSystemMessage(
             Component.translatable(
                 KEY_ADDED,
-                displayName(state, blockEntity),
+                displayName(blockEntity),
                 pos.x,
                 pos.y,
                 pos.z
@@ -123,37 +107,11 @@ object WaypointInteraction {
     }
 
     /**
-     * Имя точки, если оно задано вручную: первая непустая строка таблички либо
-     * кастомное имя флага. null — имени нет, и вызывающий подставляет перевод-заглушку.
+     * Имя точки для чата: строка таблички либо кастомное имя флага,
+     * иначе переводимая заглушка с координатами.
      */
-    private fun resolveName(blockEntity: BlockEntity): Component? {
-        if (blockEntity is SignBlockEntity) {
-            val lines = blockEntity.getText(SignTextSlot.FRONT).getMessages(false)
-            for (line in lines) {
-                val text = line.string.trim { it <= ' ' }
-                if (text.isNotEmpty()) {
-                    return line
-                }
-            }
-        }
-        if (blockEntity is BannerBlockEntity) {
-            val custom = blockEntity.customName
-            if (custom != null) {
-                val text = custom.string.trim { it <= ' ' }
-                if (text.isNotEmpty()) {
-                    return custom
-                }
-            }
-        }
-        return null
-    }
-
-    private fun displayName(state: BlockWaypointState, blockEntity: BlockEntity): Component {
-        val stored = state.name
-        if (!stored.isNullOrEmpty()) {
-            return Component.literal(stored)
-        }
-        resolveName(blockEntity)?.let { return it }
+    private fun displayName(blockEntity: BlockEntity): Component {
+        WaypointNames.resolve(blockEntity)?.let { return it }
 
         val pos = blockEntity.blockPos
         return Component.translatable(KEY_DEFAULT_NAME, pos.x, pos.y, pos.z)
