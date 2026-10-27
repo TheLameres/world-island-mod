@@ -68,8 +68,4 @@ class BlockWaypointConnection(
                 + Math.abs(position.getY() - playerPos.getY())
                 + Math.abs(position.getZ() - playerPos.getZ()))
     }
-
-    fun id(): UUID {
-        return id
-    }
 }

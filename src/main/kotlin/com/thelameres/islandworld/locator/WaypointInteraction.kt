@@ -73,7 +73,6 @@ object WaypointInteraction {
         }
 
         val state: BlockWaypointState = blockEntity.`islandworld$waypointState`()
-        state.bind(pos)
         toggle(level, state, blockEntity, player)
         return InteractionResult.SUCCESS_SERVER
     }

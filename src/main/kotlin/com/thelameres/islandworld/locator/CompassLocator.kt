@@ -3,33 +3,27 @@ package com.thelameres.islandworld.locator
 import com.thelameres.islandworld.IslandWorldMod
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.resources.Identifier
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.ai.attributes.AttributeInstance
 import net.minecraft.world.entity.ai.attributes.AttributeModifier
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.player.Player
-import net.minecraft.world.item.Item
 import net.minecraft.world.item.Items
-import net.minecraft.world.level.Level
 import java.util.*
 
 /**
- * Единая серверная точка LocatorBar:
+ * Серверная часть нативного LocatorBar.
  *
- * 1. Атрибуты нативного LocatorBar:
- *    - `waypoint_receive_range` обнуляется без компаса в руке (main/off hand);
- *    - `waypoint_transmit_range` обнуляется, если на игроке голова `PLAYER_HEAD`.
- * 2. Собственный канал: раз в [SEND_INTERVAL_TICKS] тиков каждому игроку с компасом
- *    отправляется [PlayerPositionsPayload] со списком других игроков того же измерения.
+ * Управляет атрибутами ванильного локатора:
+ *  - `waypoint_receive_range` обнуляется без компаса в руке (main/off hand);
+ *  - `waypoint_transmit_range` обнуляется, если на игроке голова `PLAYER_HEAD`.
+ *
+ * Своего HUD и сетевого канала у мода нет: список игроков строит движок
+ * из атрибутов, отрисовывает ваниль.
  */
 object CompassLocator {
-
-    private const val SEND_INTERVAL_TICKS = 4
-    private var tickCounter = 0
 
     private val RECEIVE_HIDDEN_ID: Identifier =
         Identifier.fromNamespaceAndPath(IslandWorldMod.MOD_ID, "locator_receive_hidden")
@@ -43,13 +37,8 @@ object CompassLocator {
     private val lastAttributeState: MutableMap<UUID, Pair<Boolean, Boolean>> = mutableMapOf()
 
     fun register() {
-
         ServerTickEvents.END_SERVER_TICK.register { server ->
             syncWaypointAttributes(server)
-
-            tickCounter++
-            if (tickCounter < SEND_INTERVAL_TICKS) return@register
-            tickCounter = 0
         }
 
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
@@ -85,7 +74,9 @@ object CompassLocator {
         }
     }
 
-    private fun Player.isHoldingCompass(): Boolean = mainHandItem.`is`(Items.COMPASS) || offhandItem.`is`(Items.COMPASS)
+    private fun Player.isHoldingCompass(): Boolean =
+        mainHandItem.`is`(Items.COMPASS) || offhandItem.`is`(Items.COMPASS)
 
-    private fun Player.isWearingPlayerHead(): Boolean = getItemBySlot(EquipmentSlot.HEAD).`is`(Items.PLAYER_HEAD)
+    private fun Player.isWearingPlayerHead(): Boolean =
+        getItemBySlot(EquipmentSlot.HEAD).`is`(Items.PLAYER_HEAD)
 }

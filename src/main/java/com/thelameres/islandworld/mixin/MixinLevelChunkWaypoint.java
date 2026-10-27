@@ -30,8 +30,6 @@ public abstract class MixinLevelChunkWaypoint {
         if (!(blockEntity instanceof BlockWaypointTransmitter transmitter)) return;
 
         BlockWaypointState state = transmitter.islandworld$waypointState();
-        // Позиция всегда восстанавливается из самого блока: в NBT её не храним
-        state.bind(blockEntity.getBlockPos());
         if (!state.isEnabled()) return;
 
         LevelChunk self = (LevelChunk) (Object) this;
