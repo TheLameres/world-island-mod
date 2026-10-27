@@ -5,6 +5,7 @@ import com.thelameres.islandworld.border.BoundaryManager.onDisconnect
 import com.thelameres.islandworld.border.EdgeRespawn
 import com.thelameres.islandworld.border.IslandConfigLoader
 import com.thelameres.islandworld.locator.WaypointInteraction
+import com.thelameres.islandworld.locator.WaypointRegistry
 import com.thelameres.islandworld.util.FirstJoinStore
 import com.thelameres.islandworld.util.SpawnUtil
 import com.thelameres.islandworld.worldgen.density.ModDensityFunctions
@@ -66,6 +67,15 @@ object IslandWorldMod : ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPED.register { _ ->
             SpawnUtil.reset()
             EdgeRespawn.reset()
+        }
+
+        // Waypoint-метки: после старта возвращаем сохранённые точки в WaypointManager.
+        // Реестр живёт в SavedData, но менеджер создаётся заново и о точках не знает,
+        // пока чанки не загрузятся. Без этого метки пропадали бы до первого визита чанка.
+        ServerLifecycleEvents.SERVER_STARTED.register { server ->
+            for (level in server.allLevels) {
+                WaypointRegistry.of(level).attach(level)
+            }
         }
 
         // Граница 2000 блоков: конфиг, тики, отключение, респавн

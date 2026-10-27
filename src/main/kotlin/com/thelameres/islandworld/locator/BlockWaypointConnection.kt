@@ -48,7 +48,20 @@ class BlockWaypointConnection(
         }
     }
 
-    /** Используется дефолтным isBroken(): метка рвётся, когда блок слишком далеко по манхэттену.  */
+    /**
+     * Соединение считается «порванным», когда сменился режим видимости чанка:
+     * игрок подошёл (нужна точная позиция) или отошёл (нужен уровень чанка).
+     * Ванильный default рвёт связь при манхэттенском расстоянии > 1, что для
+     * статичной точки означало бы пересоздание соединения каждый тик.
+     */
+    override fun isBroken(): Boolean {
+        val chunkVisible = WaypointTransmitter.isChunkVisible(
+            ChunkPos(position.x shr 4, position.z shr 4), receiver
+        )
+        return chunkVisible != precise
+    }
+
+    /** Расстояние до игрока по манхэттену.  */
     override fun distanceManhattan(): Int {
         val playerPos: BlockPos = receiver.blockPosition()
         return (Math.abs(position.getX() - playerPos.getX())

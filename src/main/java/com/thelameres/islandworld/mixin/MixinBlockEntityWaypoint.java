@@ -57,7 +57,7 @@ public abstract class MixinBlockEntityWaypoint implements BlockWaypointTransmitt
     @Inject(method = "loadAdditional", at = @At("TAIL"))
     private void islandworld$loadWaypoint(ValueInput input, CallbackInfo ci) {
         input.child("islandworld_waypoint").ifPresent(
-                this.islandworld$waypointState::readFrom
+                child -> this.islandworld$waypointState.readFrom(child)
         );
     }
 }

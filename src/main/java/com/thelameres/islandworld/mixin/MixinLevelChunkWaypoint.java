@@ -1,6 +1,9 @@
 package com.thelameres.islandworld.mixin;
 
+import com.thelameres.islandworld.locator.BlockWaypointState;
 import com.thelameres.islandworld.locator.BlockWaypointTransmitter;
+import com.thelameres.islandworld.locator.RegistryWaypoint;
+import com.thelameres.islandworld.locator.WaypointRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -11,16 +14,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Регистрация и снятие блочных waypoint-передатчиков.
+ * Синхронизация блок-энтitей с постоянным реестром waypoint-меток.
  *
- * Ваниль трекает только Entity (ServerLevel$EntityCallbacks), поэтому для BlockEntity
- * нужны свои точки. Все хуки — на LevelChunk, где реально происходит жизненный цикл:
- *  - setBlockEntity        — блок-энтити попал в чанк (в т.ч. при загрузке из NBT);
- *  - removeBlockEntity     — блок-энтити вынут из чанка (ломание блока, взрыв, замена блока);
- *  - clearAllBlockEntities — чанк выгружается целиком.
- *
- * Именно removeBlockEntity, а не BlockEntity.setRemoved(): последний объявлен в BlockEntity,
- * и инъекция в SignBlockEntity/BannerBlockEntity по этому имени цель не находит.
+ * Ключевое правило: точка живёт в {@link WaypointRegistry} (SavedData уровня), а не в
+ * BlockEntity. Поэтому:
+ *  - уничтожение блока (removeBlockEntity) — точку удаляем и снимаем с менеджера;
+ *  - выгрузка чанка (clearAllBlockEntities) — НИЧЕГО не делаем, точка остаётся на карте;
+ *  - загрузка чанка (setBlockEntity) — точку восстанавливаем/подтверждаем по её UUID.
  */
 @Mixin(LevelChunk.class)
 public abstract class MixinLevelChunkWaypoint {
@@ -29,19 +29,29 @@ public abstract class MixinLevelChunkWaypoint {
     private void islandworld$trackBlockWaypoint(BlockEntity blockEntity, CallbackInfo ci) {
         if (!(blockEntity instanceof BlockWaypointTransmitter transmitter)) return;
 
-        // Позицию привязываем всегда: она нужна и для connection, и после перезагрузки чанка
-        transmitter.islandworld$waypointState().bind(blockEntity.getBlockPos());
+        BlockWaypointState state = transmitter.islandworld$waypointState();
+        // Позиция всегда восстанавливается из самого блока: в NBT её не храним
+        state.bind(blockEntity.getBlockPos());
+        if (!state.isEnabled()) return;
 
         LevelChunk self = (LevelChunk) (Object) this;
         if (!(self.getLevel() instanceof ServerLevel serverLevel)) return;
-        if (!transmitter.isTransmittingWaypoint()) return;
 
-        serverLevel.getWaypointManager().trackWaypoint(transmitter);
+        // upsert идемпотентен: после повторной загрузки чанка вернётся тот же передатчик,
+        // и метка на клиенте сохранит свой UUID (без мигания «удалить/добавить»).
+        WaypointRegistry registry = WaypointRegistry.of(serverLevel);
+        RegistryWaypoint waypoint = registry.upsert(
+                state.id(),
+                blockEntity.getBlockPos(),
+                state.nameOrNull(),
+                state.getColorRgb()
+        );
+        serverLevel.getWaypointManager().trackWaypoint(waypoint);
     }
 
     /**
-     * Блок уничтожен — снимаем метку с WaypointManager, чтобы клиенты перестали получать обновления.
-     * Инъекция в HEAD: на этот момент BE ещё лежит в map, поэтому getBlockEntity его возвращает.
+     * Блок уничтожен — метка должна исчезнуть у всех игроков и не воскреснуть.
+     * Инъекция в HEAD: на этот момент BE ещё лежит в map, поэтому getBlockEntity его находит.
      */
     @Inject(method = "removeBlockEntity", at = @At("HEAD"))
     private void islandworld$untrackBlockWaypoint(BlockPos pos, CallbackInfo ci) {
@@ -50,26 +60,14 @@ public abstract class MixinLevelChunkWaypoint {
 
         BlockEntity blockEntity = self.getBlockEntity(pos);
         if (!(blockEntity instanceof BlockWaypointTransmitter transmitter)) return;
-        if (!transmitter.isTransmittingWaypoint()) return;
 
-        serverLevel.getWaypointManager().untrackWaypoint(transmitter);
-    }
+        BlockWaypointState state = transmitter.islandworld$waypointState();
+        if (!state.isEnabled()) return;
 
-    /**
-     * Чанк выгружается целиком — снимаем все метки этого чанка.
-     * Состояние при этом остаётся в NBT (saveAdditional отрабатывает отдельно), поэтому
-     * после повторной загрузки чанка метки восстановятся через setBlockEntity.
-     */
-    @Inject(method = "clearAllBlockEntities", at = @At("HEAD"))
-    private void islandworld$untrackAllBlockWaypoints(CallbackInfo ci) {
-        LevelChunk self = (LevelChunk) (Object) this;
-        if (!(self.getLevel() instanceof ServerLevel serverLevel)) return;
-
-        for (BlockEntity blockEntity : self.getBlockEntities().values()) {
-            if (blockEntity instanceof BlockWaypointTransmitter transmitter
-                    && transmitter.isTransmittingWaypoint()) {
-                serverLevel.getWaypointManager().untrackWaypoint(transmitter);
-            }
+        WaypointRegistry registry = WaypointRegistry.of(serverLevel);
+        RegistryWaypoint removed = registry.remove(state.id());
+        if (removed != null) {
+            serverLevel.getWaypointManager().untrackWaypoint(removed);
         }
     }
 }

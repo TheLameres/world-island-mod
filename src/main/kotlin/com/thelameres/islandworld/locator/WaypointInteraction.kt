@@ -74,16 +74,20 @@ object WaypointInteraction {
 
         val state: BlockWaypointState = blockEntity.`islandworld$waypointState`()
         state.bind(pos)
-        toggle(level, blockEntity, state, blockEntity, player)
+        toggle(level, state, blockEntity, player)
         return InteractionResult.SUCCESS_SERVER
     }
 
     private fun toggle(
-        level: ServerLevel, transmitter: BlockWaypointTransmitter,
+        level: ServerLevel,
         state: BlockWaypointState, blockEntity: BlockEntity, player: ServerPlayer
     ) {
+        val registry = WaypointRegistry.of(level)
+
         if (state.isEnabled) {
-            level.waypointManager.untrackWaypoint(transmitter)
+            // Снимаем и с реестра (чтобы точка не воскресла после выгрузки/перезагрузки),
+            // и с менеджера, чтобы у игроков сразу пропала метка
+            registry.remove(state.id())?.let { removed -> level.waypointManager.untrackWaypoint(removed) }
             state.setEnabled(false)
             blockEntity.setChanged()
             player.sendSystemMessage(
@@ -97,8 +101,15 @@ object WaypointInteraction {
         // чтобы безымянная точка тоже локализовалась на клиенте.
         state.name = resolveName(blockEntity)?.string
         state.setEnabled(true)
-        level.waypointManager.trackWaypoint(transmitter)
         blockEntity.setChanged()
+
+        val waypoint = registry.upsert(
+            state.id(),
+            blockEntity.blockPos,
+            state.nameOrNull(),
+            state.getColorRgb()
+        )
+        level.waypointManager.trackWaypoint(waypoint)
 
         val pos = blockEntity.blockPos
         player.sendSystemMessage(
