@@ -2,6 +2,7 @@ package com.thelameres.islandworld.client.hud
 
 import com.thelameres.islandworld.IslandWorldMod
 import com.thelameres.islandworld.client.hud.CompassCoordinatesHud.REFRESH_TICKS
+import com.thelameres.islandworld.core.Registrable
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.player.LocalPlayer
@@ -19,7 +20,7 @@ import kotlin.random.Random
  * - Любые другие измерения (кастомные миры, black_room и т.д.) — случайные числа,
  *   которые обновляются каждые [REFRESH_TICKS] тиков.
  */
-object CompassCoordinatesHud {
+object CompassCoordinatesHud : Registrable {
     private val ELEMENT_ID: Identifier =
         Identifier.fromNamespaceAndPath(IslandWorldMod.MOD_ID, "compass_coordinates")
 
@@ -33,7 +34,7 @@ object CompassCoordinatesHud {
     private var randomY = 0
     private var randomZ = 0
 
-    fun register() {
+    override fun register() {
         ClientTickEvents.END_CLIENT_TICK.register { _ ->
             tickCounter++
             if (tickCounter >= REFRESH_TICKS) {

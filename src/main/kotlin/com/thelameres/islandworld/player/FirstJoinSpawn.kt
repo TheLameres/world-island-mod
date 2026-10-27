@@ -1,9 +1,9 @@
 package com.thelameres.islandworld.player
 
 import com.thelameres.islandworld.IslandWorldMod
+import com.thelameres.islandworld.core.Registrable
 import com.thelameres.islandworld.util.FirstJoinStore
 import com.thelameres.islandworld.util.SpawnUtil
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.world.level.storage.LevelData
 
@@ -16,9 +16,9 @@ import net.minecraft.world.level.storage.LevelData
  * Кэш стартовой точки в [SpawnUtil] описывает состояние конкретной сессии сервера,
  * поэтому сбрасывается здесь же — на остановке.
  */
-object FirstJoinSpawn {
+object FirstJoinSpawn : Registrable {
 
-    fun register() {
+    override fun register() {
         ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
             val player = handler.player
             if (FirstJoinStore.hasJoined(server, player.uuid)) return@register
@@ -53,10 +53,6 @@ object FirstJoinSpawn {
                 player.name.string,
                 spawn
             )
-        }
-
-        ServerLifecycleEvents.SERVER_STOPPED.register { _ ->
-            SpawnUtil.reset()
         }
     }
 }

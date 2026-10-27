@@ -1,5 +1,6 @@
 package com.thelameres.islandworld.locator
 
+import com.thelameres.islandworld.core.Registrable
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.Component
@@ -22,17 +23,17 @@ import net.minecraft.world.phys.BlockHitResult
  * - повторный Shift+ПКМ по той же точке снимает метку.
  *
  * Источник истины о том, включена ли метка, — [WaypointStore]: наличие позиции блока
- * в хранилище. В блок-энтitи ничего не пишется.
+ * в хранилище. В блок-энтити ничего не пишется.
  *
  * Все сообщения отправляются как Component.translatable: клиент сам подставит текст
  * из assets/islandworld/lang/<locale>.json, поэтому строки не зашиты в код.
  */
-object WaypointInteraction {
+object WaypointInteraction : Registrable {
     private const val KEY_ADDED = "islandworld.waypoint.added"
     private const val KEY_REMOVED = "islandworld.waypoint.removed"
     private const val KEY_DEFAULT_NAME = "islandworld.waypoint.default_name"
 
-    fun register() {
+    override fun register() {
         UseBlockCallback.EVENT.register(UseBlockCallback { player: Player, level: Level, hand: InteractionHand, hit: BlockHitResult ->
             onUseBlock(
                 player,

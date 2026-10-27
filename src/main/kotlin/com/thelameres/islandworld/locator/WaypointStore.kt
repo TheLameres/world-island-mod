@@ -1,8 +1,9 @@
 package com.thelameres.islandworld.locator
 
 import com.mojang.serialization.Codec
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import com.thelameres.islandworld.IslandWorldMod
+import com.thelameres.islandworld.core.Registrable
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
@@ -11,7 +12,6 @@ import net.minecraft.util.datafix.DataFixTypes
 import net.minecraft.world.level.saveddata.SavedData
 import net.minecraft.world.level.saveddata.SavedDataType
 import java.util.*
-import java.util.function.Supplier
 
 
 /**
@@ -107,7 +107,7 @@ class WaypointStore : SavedData() {
         return root
     }
 
-    companion object {
+    companion object : Registrable {
         private val CODEC: Codec<WaypointStore> =
             CompoundTag.CODEC.xmap({ tag -> ofTag(tag) }, { store -> store.toTag() })
 
@@ -154,7 +154,7 @@ class WaypointStore : SavedData() {
          * пока чанки не загрузятся.
          */
         @JvmStatic
-        fun register() {
+        override fun register() {
             ServerLifecycleEvents.SERVER_STARTED.register { server ->
                 for (level in server.allLevels) {
                     of(level).attach(level)

@@ -1,14 +1,21 @@
 {
   "unknown_death": {
     "subtitle": "islandworld.subtitle.unknown_death",
-    "sounds": [{ "name": "islandworld:unknown_death", "stream": false }]
+    "sounds": [
+      {
+        "name": "islandworld:unknown_death",
+        "stream": false
+      }
+    ]
   },
   "unknown_death_distant": {
     "subtitle": "islandworld.subtitle.unknown_death",
-    "sounds": [{
-      "name": "islandworld:unknown_death_distant",
-      "stream": false,
-      "attenuation_distance": 4000
-    }]
+    "sounds": [
+      {
+        "name": "islandworld:unknown_death_distant",
+        "stream": false,
+        "attenuation_distance": 4000
+      }
+    ]
   }
 }

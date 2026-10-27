@@ -1,5 +1,6 @@
 package com.thelameres.islandworld.util
 
+import com.thelameres.islandworld.core.SessionScoped
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
@@ -23,7 +24,7 @@ import kotlin.math.sqrt
  * Сами проверки мира живут в [LevelPredicates] как расширения: здесь остаётся только
  * то, что относится к стартовой точке, — константы цели и кэш.
  */
-object SpawnUtil {
+object SpawnUtil : SessionScoped {
 
     private val LOGGER = LoggerFactory.getLogger("islandworld/spawn")
 
@@ -34,8 +35,8 @@ object SpawnUtil {
     @Volatile
     private var cachedSpawn: BlockPos? = null
 
-    /** Сбрасывает кэш (вызывается при остановке сервера). */
-    fun reset() {
+    /** Сбрасывает кэш стартовой точки: вызывается на SERVER_STOPPED через Lifecycle. */
+    override fun reset() {
         cachedSpawn = null
     }
 

@@ -52,16 +52,16 @@ fun ServerLevel.isOceanAt(x: Int, z: Int): Boolean =
 /** Годится ли блок как опора под ногами: земля, песок или трава. */
 fun BlockState.isGround(): Boolean =
     `is`(BlockTags.DIRT)
-        || `is`(BlockTags.SAND)
-        || `is`(Blocks.GRASS_BLOCK)
+            || `is`(BlockTags.SAND)
+            || `is`(Blocks.GRASS_BLOCK)
 
 /** Свободно ли место для игрока: нет коллизии, жидкости, брёвен и листвы. */
 fun ServerLevel.isPassable(pos: BlockPos): Boolean {
     val state = getBlockState(pos)
     return state.getCollisionShape(this, pos).isEmpty
-        && getFluidState(pos).isEmpty
-        && !state.`is`(BlockTags.LOGS)
-        && !state.`is`(BlockTags.LEAVES)
+            && getFluidState(pos).isEmpty
+            && !state.`is`(BlockTags.LOGS)
+            && !state.`is`(BlockTags.LEAVES)
 }
 
 /** Есть ли ствол или листва в пределах [TREE_CHECK_HEIGHT] над точкой [feet]. */

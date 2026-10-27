@@ -1,44 +1,44 @@
 {
-	"schemaVersion": 1,
-	"id": "islandworld",
-	"version": "${version}",
-	"name": "Island World",
-	"description": "Генерация мира в виде острова ~1500x1500 блоков, окружённого океаном.",
-	"authors": [
-		"TheLameres"
-	],
-	"contact": {
-		"homepage": "https://github.com/TheLameres/world-island-mod",
-		"sources": "https://github.com/TheLameres/world-island-mod"
-	},
-	"license": "MIT",
-	"environment": "*",
-	"entrypoints": {
-		"main": [
-			{
-				"value": "com.thelameres.islandworld.IslandWorldMod",
-				"adapter": "kotlin"
-			}
-		],
-		"client": [
-			{
-				"value": "com.thelameres.islandworld.client.IslandWorldClient",
-				"adapter": "kotlin"
-			}
-		]
-	},
-	"mixins": [
-		"islandworld.mixins.json",
-		{
-			"config": "islandworld.client.mixins.json",
-			"environment": "client"
-		}
-	],
-	"depends": {
-		"fabricloader": ">=0.19.5",
-		"minecraft": "~26.3",
-		"java": ">=25",
-		"fabric-api": "*",
-		"fabric-language-kotlin": "*"
-	}
+  "schemaVersion": 1,
+  "id": "islandworld",
+  "version": "${version}",
+  "name": "Island World",
+  "description": "Генерация мира в виде острова ~1500x1500 блоков, окружённого океаном.",
+  "authors": [
+    "TheLameres"
+  ],
+  "contact": {
+    "homepage": "https://github.com/TheLameres/world-island-mod",
+    "sources": "https://github.com/TheLameres/world-island-mod"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      {
+        "value": "com.thelameres.islandworld.IslandWorldMod",
+        "adapter": "kotlin"
+      }
+    ],
+    "client": [
+      {
+        "value": "com.thelameres.islandworld.client.IslandWorldClient",
+        "adapter": "kotlin"
+      }
+    ]
+  },
+  "mixins": [
+    "islandworld.mixins.json",
+    {
+      "config": "islandworld.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*",
+    "fabric-language-kotlin": "*"
+  }
 }

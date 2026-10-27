@@ -3,14 +3,13 @@ package com.thelameres.islandworld.worldgen.blackroom
 import com.mojang.serialization.MapCodec
 import com.mojang.serialization.codecs.RecordCodecBuilder
 import com.thelameres.islandworld.IslandWorldMod
+import com.thelameres.islandworld.core.Registrable
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Holder
 import net.minecraft.core.Registry
-import net.minecraft.core.RegistryAccess
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.level.WorldGenRegion
 import net.minecraft.util.random.WeightedList
-import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.LevelHeightAccessor
@@ -23,11 +22,10 @@ import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.chunk.ChunkAccess
 import net.minecraft.world.level.chunk.ChunkGenerator
-import net.minecraft.world.level.chunk.ChunkGeneratorStructureState
 import net.minecraft.world.level.levelgen.Heightmap
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings
 import net.minecraft.world.level.levelgen.RandomState
 import net.minecraft.world.level.levelgen.blending.Blender
-import net.minecraft.world.level.levelgen.NoiseGeneratorSettings
 import net.minecraft.world.level.levelgen.densityfunction.SamplerContext
 import java.util.concurrent.CompletableFuture
 
@@ -142,7 +140,7 @@ open class BlackRoomChunkGenerator(
         return pos.x in -h..h && pos.z in -h..h
     }
 
-    companion object {
+    companion object : Registrable {
         val CODEC: MapCodec<BlackRoomChunkGenerator> = RecordCodecBuilder.mapCodec { instance ->
             instance.group(
                 BiomeSource.CODEC.fieldOf("biome_source").forGetter { it.biomeSource },
@@ -150,7 +148,7 @@ open class BlackRoomChunkGenerator(
             ).apply(instance, ::BlackRoomChunkGenerator)
         }
 
-        fun register() {
+        override fun register() {
             Registry.register(
                 BuiltInRegistries.CHUNK_GENERATOR,
                 IslandWorldMod.id("black_room_generator"),

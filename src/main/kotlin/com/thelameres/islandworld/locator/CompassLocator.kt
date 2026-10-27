@@ -1,12 +1,12 @@
 package com.thelameres.islandworld.locator
 
 import com.thelameres.islandworld.IslandWorldMod
+import com.thelameres.islandworld.core.PlayerScoped
+import com.thelameres.islandworld.core.Registrable
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.resources.Identifier
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.ai.attributes.AttributeInstance
 import net.minecraft.world.entity.ai.attributes.AttributeModifier
@@ -37,7 +37,7 @@ import java.util.*
  * Лечится двумя вещами: сбрасывать кэш при респавне и не доверять кэшу,
  * а сверяться с фактическим наличием модификатора на атрибуте.
  */
-object CompassLocator {
+object CompassLocator : Registrable, PlayerScoped {
 
     private val RECEIVE_HIDDEN_ID: Identifier =
         Identifier.fromNamespaceAndPath(IslandWorldMod.MOD_ID, "locator_receive_hidden")
@@ -53,29 +53,25 @@ object CompassLocator {
      */
     private val lastAttributeState: MutableMap<UUID, Pair<Boolean, Boolean>> = mutableMapOf()
 
-    fun register() {
+    override fun register() {
         ServerTickEvents.END_SERVER_TICK.register { server ->
             syncWaypointAttributes(server)
-        }
-
-        ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
-            lastAttributeState.remove(handler.player.uuid)
         }
 
         // После смерти создаётся новый ServerPlayer без наших временных модификаторов
         // атрибутов, поэтому кэш по UUID надо сбросить — иначе бар останется с точками
         ServerPlayerEvents.AFTER_RESPAWN.register { _, newPlayer, _ ->
-            onRespawn(newPlayer)
+            forget(newPlayer.uuid)
         }
     }
 
     /**
-     * Сброс кэша при респавне: после смерти это новый объект игрока, и его атрибуты
-     * не содержат наших временных модификаторов, даже если кэш помнит обратное.
-     * Без сброса состояние «был с компасом» сохранялось бы, и бар оставался видимым.
+     * Сброс кэша: после респавна это новый объект игрока, и его атрибуты не содержат
+     * наших временных модификаторов, даже если кэш помнит обратное. Без сброса состояние
+     * «был с компасом» сохранялось бы, и бар оставался бы видимым.
      */
-    private fun onRespawn(player: ServerPlayer) {
-        lastAttributeState.remove(player.uuid)
+    override fun forget(uuid: UUID) {
+        lastAttributeState.remove(uuid)
     }
 
     /**

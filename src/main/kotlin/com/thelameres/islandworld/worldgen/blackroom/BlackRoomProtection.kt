@@ -1,16 +1,16 @@
 package com.thelameres.islandworld.worldgen.blackroom
 
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents
-import net.fabricmc.fabric.api.event.player.UseBlockCallback
+import com.thelameres.islandworld.core.Registrable
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents
+import net.fabricmc.fabric.api.event.player.UseBlockCallback
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionResult
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.Mob
-import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.Level
 
 /**
@@ -18,9 +18,9 @@ import net.minecraft.world.level.Level
  * запрет ломания и установки блоков, отключение спавна мобов,
  * респавн игрока на острове.
  */
-object BlackRoomProtection {
+object BlackRoomProtection : Registrable {
 
-    fun register() {
+    override fun register() {
         // Запрет ломания блоков
         PlayerBlockBreakEvents.BEFORE.register { level, _, _, _, _ ->
             level.dimension() != BlackRoom.DIMENSION

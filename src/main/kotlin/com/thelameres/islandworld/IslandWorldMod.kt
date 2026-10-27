@@ -1,6 +1,8 @@
 package com.thelameres.islandworld
 
 import com.thelameres.islandworld.border.BoundaryManager
+import com.thelameres.islandworld.core.Lifecycle
+import com.thelameres.islandworld.core.Registrable
 import com.thelameres.islandworld.locator.CompassLocator
 import com.thelameres.islandworld.locator.WaypointInteraction
 import com.thelameres.islandworld.locator.WaypointStore
@@ -22,28 +24,41 @@ object IslandWorldMod : ModInitializer {
     val LOGGER: Logger = LoggerFactory.getLogger(MOD_ID)
 
     /**
-     * Точка сборки: здесь только register-вызовы. Каждая подсистема сама решает,
-     * на какие события подписаться и как жить в их рамках — см. её register().
+     * Подсистемы в порядке подключения.
+     *
+     * Порядок значим: общие подписки ([Lifecycle]) идут первыми, чтобы DISCONNECT
+     * и SERVER_STOPPED были зарегистрированы раньше, чем частные обработчики подсистем.
+     * Генерация мира не зависит от остальных, но держится в начале списка, чтобы
+     * реестры заполнялись до того, как мир начнёт загружаться.
      */
-    override fun onInitialize() {
+    private val subsystems: List<Registrable> = listOf(
+        // Общие подписки на жизненный цикл сервера
+        Lifecycle,
+
         // Генерация мира
-        ModDensityFunctions.register()
-        OceanConcentricRingsPlacement.register()
-        BlackRoomChunkGenerator.register()
-        BlackRoomWrapAround.register()
-        BlackRoomProtection.register()
+        ModDensityFunctions,
+        OceanConcentricRingsPlacement,
+        BlackRoomChunkGenerator,
+        BlackRoomWrapAround,
+        BlackRoomProtection,
 
         // LocatorBar и waypoint-метки
-        CompassLocator.register()
-        WaypointStore.register()
-        WaypointInteraction.register()
+        CompassLocator,
+        WaypointStore,
+        WaypointInteraction,
 
         // Игровые подсистемы
-        FirstJoinSpawn.register()
-        BoundaryManager.register()
+        FirstJoinSpawn,
+        BoundaryManager,
+    )
+
+    override fun onInitialize() {
+        subsystems.forEach { it.register() }
 
         LOGGER.info("Island World initialised (worldgen stage 1, boundary 2000)")
     }
 
-    fun id(path: String): Identifier = Identifier.fromNamespaceAndPath(MOD_ID, path)
+    fun id(path: String): Identifier {
+        return Identifier.fromNamespaceAndPath(MOD_ID, path)
+    }
 }
