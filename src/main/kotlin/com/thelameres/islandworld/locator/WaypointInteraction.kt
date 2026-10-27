@@ -23,8 +23,15 @@ import net.minecraft.world.phys.BlockHitResult
  * - требуется компас в руке, которой кликнули;
  * - обычный ПКМ по табличке без Shift не перехватывается, чтобы не ломать ванильное редактирование;
  * - повторный Shift+ПКМ по той же точке снимает метку.
+ *
+ * Все сообщения отправляются как Component.translatable: клиент сам подставит текст
+ * из assets/islandworld/lang/<locale>.json, поэтому строки не зашиты в код.
  */
 object WaypointInteraction {
+    private const val KEY_ADDED = "islandworld.waypoint.added"
+    private const val KEY_REMOVED = "islandworld.waypoint.removed"
+    private const val KEY_DEFAULT_NAME = "islandworld.waypoint.default_name"
+
     fun register() {
         UseBlockCallback.EVENT.register(UseBlockCallback { player: Player, level: Level, hand: InteractionHand, hit: BlockHitResult ->
             onUseBlock(
@@ -80,34 +87,42 @@ object WaypointInteraction {
             state.setEnabled(false)
             blockEntity.setChanged()
             player.sendSystemMessage(
-                Component.literal("Метка снята: " + displayName(state, blockEntity))
+                Component.translatable(KEY_REMOVED, displayName(state, blockEntity))
                     .withStyle(ChatFormatting.GRAY)
             )
             return
         }
 
-        state.name = resolveName(blockEntity)
+        // В state храним только «плоское» имя для сравнения; в чат уходит Component,
+        // чтобы безымянная точка тоже локализовалась на клиенте.
+        state.name = resolveName(blockEntity)?.string
         state.setEnabled(true)
         level.waypointManager.trackWaypoint(transmitter)
         blockEntity.setChanged()
 
         val pos = blockEntity.blockPos
         player.sendSystemMessage(
-            Component.literal(
-                "Метка добавлена: \"${displayName(state, blockEntity)} (${pos.x}, ${pos.y}, ${pos.z})"
-            )
-                .withStyle(ChatFormatting.GREEN)
+            Component.translatable(
+                KEY_ADDED,
+                displayName(state, blockEntity),
+                pos.x,
+                pos.y,
+                pos.z
+            ).withStyle(ChatFormatting.GREEN)
         )
     }
 
-    /** Имя точки: первая непустая строка таблички, иначе кастомное имя флага, иначе координаты.  */
-    private fun resolveName(blockEntity: BlockEntity): String {
+    /**
+     * Имя точки, если оно задано вручную: первая непустая строка таблички либо
+     * кастомное имя флага. null — имени нет, и вызывающий подставляет перевод-заглушку.
+     */
+    private fun resolveName(blockEntity: BlockEntity): Component? {
         if (blockEntity is SignBlockEntity) {
             val lines: MutableList<Component> = blockEntity.getText(SignTextSlot.FRONT).getMessages(false)
             for (line in lines) {
                 val text = line.string.trim { it <= ' ' }
                 if (text.isNotEmpty()) {
-                    return text
+                    return line
                 }
             }
         }
@@ -116,15 +131,21 @@ object WaypointInteraction {
             if (custom != null) {
                 val text = custom.string.trim { it <= ' ' }
                 if (text.isNotEmpty()) {
-                    return text
+                    return custom
                 }
             }
         }
-        val pos = blockEntity.blockPos
-        return "Точка " + pos.x + " " + pos.y + " " + pos.z
+        return null
     }
 
-    private fun displayName(state: BlockWaypointState, blockEntity: BlockEntity): String? {
-        return if (state.name.isNullOrEmpty()) resolveName(blockEntity) else state.name
+    private fun displayName(state: BlockWaypointState, blockEntity: BlockEntity): Component {
+        val stored = state.name
+        if (!stored.isNullOrEmpty()) {
+            return Component.literal(stored)
+        }
+        resolveName(blockEntity)?.let { return it }
+
+        val pos = blockEntity.blockPos
+        return Component.translatable(KEY_DEFAULT_NAME, pos.x, pos.y, pos.z)
     }
 }

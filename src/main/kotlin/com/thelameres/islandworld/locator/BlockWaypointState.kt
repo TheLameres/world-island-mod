@@ -68,7 +68,7 @@ class BlockWaypointState(
         }
         // Далёкие чанки не грузим: ванильный LocatorBar сам шлёт «далеко» вариант для LivingEntity,
         // для блока достаточно не показывать метку, пока чанк не загружен у игрока.
-        if (!WaypointTransmitter.isChunkVisible(ChunkPos(position!!.x, position!!.z), receiver)) {
+        if (!WaypointTransmitter.isChunkVisible(ChunkPos.containing(position!!), receiver)) {
             return Optional.of<WaypointTransmitter.Connection>(
                 BlockWaypointConnection(
                     id,

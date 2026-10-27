@@ -1,5 +1,8 @@
 {
   "generator.islandworld.island": "Остров в океане",
   "death.attack.islandworld.unknown": "%s был уничтожен незримой сущностью",
-  "islandworld.subtitle.unknown_death": "Незримая сущность"
+  "islandworld.subtitle.unknown_death": "Незримая сущность",
+  "islandworld.waypoint.added": "Метка добавлена: «%s» (%s, %s, %s)",
+  "islandworld.waypoint.removed": "Метка снята: %s",
+  "islandworld.waypoint.default_name": "Точка %s %s %s"
 }

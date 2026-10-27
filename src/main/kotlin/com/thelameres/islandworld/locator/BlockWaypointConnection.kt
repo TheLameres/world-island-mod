@@ -25,7 +25,7 @@ class BlockWaypointConnection(
             receiver.connection.send(
                 ClientboundTrackedWaypointPacket.addWaypointChunk(
                     id, icon,
-                    ChunkPos(position.x, position.z)
+                    ChunkPos(position.x shr 4, position.z shr 4)
                 )
             )
         }
@@ -42,7 +42,7 @@ class BlockWaypointConnection(
             receiver.connection.send(
                 ClientboundTrackedWaypointPacket.updateWaypointChunk(
                     id, icon,
-                    ChunkPos(position.x, position.z)
+                    ChunkPos(position.x shr 4, position.z shr 4)
                 )
             )
         }
