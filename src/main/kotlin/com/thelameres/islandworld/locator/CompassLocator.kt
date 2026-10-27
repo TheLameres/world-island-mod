@@ -25,23 +25,11 @@ import java.util.*
  *    - `waypoint_transmit_range` обнуляется, если на игроке голова `PLAYER_HEAD`.
  * 2. Собственный канал: раз в [SEND_INTERVAL_TICKS] тиков каждому игроку с компасом
  *    отправляется [PlayerPositionsPayload] со списком других игроков того же измерения.
- *
- * Карты `playerListAt*` заполняются только игроками без `PLAYER_HEAD`, поэтому
- * для атрибутов обход идёт по `server.playerList.players`, а не по картам.
  */
 object CompassLocator {
 
-    val playerListAtOverworld: MutableMap<UUID, Player> = mutableMapOf()
-    val playerListAtNether: MutableMap<UUID, Player> = mutableMapOf()
-    val playerListAtEnd: MutableMap<UUID, Player> = mutableMapOf()
-
-    private val vanillaDimensions = setOf(Level.OVERWORLD, Level.NETHER, Level.END)
-
     private const val SEND_INTERVAL_TICKS = 4
     private var tickCounter = 0
-
-    /** Игроки, которым на прошлом цикле отправлялся непустой список; нужны для очистки бара. */
-    private var previousHolders: Set<UUID> = emptySet()
 
     private val RECEIVE_HIDDEN_ID: Identifier =
         Identifier.fromNamespaceAndPath(IslandWorldMod.MOD_ID, "locator_receive_hidden")
@@ -55,21 +43,6 @@ object CompassLocator {
     private val lastAttributeState: MutableMap<UUID, Pair<Boolean, Boolean>> = mutableMapOf()
 
     fun register() {
-        // Карты очищаем один раз за серверный тик, а не на каждом уровне.
-        ServerTickEvents.START_SERVER_TICK.register { _ ->
-            clear()
-        }
-
-        // ServerLevel.players() — метод уровня, не сервера
-        ServerTickEvents.START_LEVEL_TICK.register { level ->
-            level.players().filter { it.getHeadItem() != Items.PLAYER_HEAD }.forEach { player ->
-                when (player.level().dimension()) {
-                    Level.OVERWORLD -> playerListAtOverworld[player.uuid] = player
-                    Level.NETHER -> playerListAtNether[player.uuid] = player
-                    Level.END -> playerListAtEnd[player.uuid] = player
-                }
-            }
-        }
 
         ServerTickEvents.END_SERVER_TICK.register { server ->
             syncWaypointAttributes(server)
@@ -77,7 +50,6 @@ object CompassLocator {
             tickCounter++
             if (tickCounter < SEND_INTERVAL_TICKS) return@register
             tickCounter = 0
-            sendPositions(server)
         }
 
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
@@ -113,61 +85,7 @@ object CompassLocator {
         }
     }
 
-    /**
-     * Отправляет каждому игроку с компасом (в обычных измерениях) список других видимых игроков
-     * того же измерения. Источник данных — карты playerListAt*.
-     */
-    private fun sendPositions(server: MinecraftServer) {
-        val everyone = allPlayers()
-        val currentHolders = mutableSetOf<UUID>()
-
-        everyone.filter { it.isHoldingCompass() && it.isAtVanillaDimensions() }.forEach { receiver ->
-            val serverReceiver = receiver as? ServerPlayer ?: return@forEach
-            currentHolders.add(receiver.uuid)
-
-            val dimension = receiver.level().dimension()
-            val entries =
-                everyone.filter { it.uuid != receiver.uuid }.filter { it.level().dimension() == dimension }
-                    .map { it.toLocatorEntry() }
-
-            ServerPlayNetworking.send(serverReceiver, PlayerPositionsPayload(entries))
-        }
-
-        // Тем, у кого компас только что убрали, отправляем пустой список — бар на клиенте очищается
-        (previousHolders - currentHolders).forEach { uuid ->
-            server.playerList.getPlayer(uuid)?.let { player ->
-                ServerPlayNetworking.send(player, PlayerPositionsPayload(emptyList()))
-            }
-        }
-        previousHolders = currentHolders
-    }
-
-    private fun allPlayers(): List<Player> =
-        playerListAtOverworld.values + playerListAtNether.values + playerListAtEnd.values
-
-    private fun clear() {
-        playerListAtOverworld.clear()
-        playerListAtNether.clear()
-        playerListAtEnd.clear()
-    }
-
     private fun Player.isHoldingCompass(): Boolean = mainHandItem.`is`(Items.COMPASS) || offhandItem.`is`(Items.COMPASS)
 
     private fun Player.isWearingPlayerHead(): Boolean = getItemBySlot(EquipmentSlot.HEAD).`is`(Items.PLAYER_HEAD)
-
-    private fun Player.isAtVanillaDimensions(): Boolean = vanillaDimensions.contains(level().dimension())
-
-    private fun Player.getHeadItem(): Item = getItemBySlot(EquipmentSlot.HEAD).item
-
-    private fun Player.toLocatorEntry(): LocatorEntry {
-        val pos = blockPosition()
-        return LocatorEntry(
-            uuid = uuid,
-            name = gameProfile.name,
-            x = pos.x,
-            y = pos.y,
-            z = pos.z,
-            dimension = level().dimension().identifier(),
-        )
-    }
 }

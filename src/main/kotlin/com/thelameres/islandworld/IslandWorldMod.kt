@@ -29,7 +29,6 @@ object IslandWorldMod : ModInitializer {
         ModDensityFunctions.register()
 
         // LocatorBar: регистрация payload и периодическая отправка позиций игрокам с компасом
-        com.thelameres.islandworld.locator.PlayerPositionsPayload.register()
         com.thelameres.islandworld.locator.CompassLocator.register()
         WaypointInteraction.register()
 
