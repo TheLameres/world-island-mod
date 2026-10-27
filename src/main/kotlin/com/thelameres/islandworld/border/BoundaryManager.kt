@@ -1,5 +1,9 @@
 package com.thelameres.islandworld.border
 
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.network.chat.Component
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
@@ -21,6 +25,31 @@ object BoundaryManager {
 
 	fun init(file: IslandConfigFile) {
 		config = file
+	}
+
+	/**
+	 * Подключает границу к жизненному циклу сервера: конфиг, тики, отключение,
+	 * респавн и сброс состояния при остановке.
+	 */
+	fun register() {
+		init(IslandConfigLoader.load())
+
+		ServerTickEvents.END_SERVER_TICK.register { server ->
+			tick(server)
+		}
+
+		ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+			onDisconnect(handler.player.uuid)
+		}
+
+		ServerPlayerEvents.AFTER_RESPAWN.register { _, newPlayer, _ ->
+			onRespawn(newPlayer.uuid)
+			EdgeRespawn.handleRespawn(newPlayer)
+		}
+
+		ServerLifecycleEvents.SERVER_STOPPED.register { _ ->
+			EdgeRespawn.reset()
+		}
 	}
 
 	fun tick(server: MinecraftServer) {

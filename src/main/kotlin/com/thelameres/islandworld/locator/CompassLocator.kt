@@ -1,6 +1,7 @@
 package com.thelameres.islandworld.locator
 
 import com.thelameres.islandworld.IslandWorldMod
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
 import net.minecraft.resources.Identifier
@@ -60,6 +61,12 @@ object CompassLocator {
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
             lastAttributeState.remove(handler.player.uuid)
         }
+
+        // После смерти создаётся новый ServerPlayer без наших временных модификаторов
+        // атрибутов, поэтому кэш по UUID надо сбросить — иначе бар останется с точками
+        ServerPlayerEvents.AFTER_RESPAWN.register { _, newPlayer, _ ->
+            onRespawn(newPlayer)
+        }
     }
 
     /**
@@ -67,7 +74,7 @@ object CompassLocator {
      * не содержат наших временных модификаторов, даже если кэш помнит обратное.
      * Без сброса состояние «был с компасом» сохранялось бы, и бар оставался видимым.
      */
-    fun onRespawn(player: ServerPlayer) {
+    private fun onRespawn(player: ServerPlayer) {
         lastAttributeState.remove(player.uuid)
     }
 

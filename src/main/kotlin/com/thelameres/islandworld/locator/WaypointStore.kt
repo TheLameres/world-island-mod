@@ -1,6 +1,7 @@
 package com.thelameres.islandworld.locator
 
 import com.mojang.serialization.Codec
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import com.thelameres.islandworld.IslandWorldMod
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
@@ -145,6 +146,20 @@ class WaypointStore : SavedData() {
                 )
             }
             return store
+        }
+
+        /**
+         * Возвращает сохранённые метки в WaypointManager после старта сервера.
+         * Хранилище живёт в SavedData, но менеджер создаётся заново и о точках не знает,
+         * пока чанки не загрузятся.
+         */
+        @JvmStatic
+        fun register() {
+            ServerLifecycleEvents.SERVER_STARTED.register { server ->
+                for (level in server.allLevels) {
+                    of(level).attach(level)
+                }
+            }
         }
 
         @JvmStatic

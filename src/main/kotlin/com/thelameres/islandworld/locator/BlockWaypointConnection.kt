@@ -8,6 +8,7 @@ import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.waypoints.Waypoint
 import net.minecraft.world.waypoints.WaypointTransmitter
 import java.util.*
+import kotlin.math.abs
 
 
 class BlockWaypointConnection(
@@ -64,8 +65,8 @@ class BlockWaypointConnection(
     /** Расстояние до игрока по манхэттену.  */
     override fun distanceManhattan(): Int {
         val playerPos: BlockPos = receiver.blockPosition()
-        return (Math.abs(position.getX() - playerPos.getX())
-                + Math.abs(position.getY() - playerPos.getY())
-                + Math.abs(position.getZ() - playerPos.getZ()))
+        return (abs(position.x - playerPos.x)
+                + abs(position.y - playerPos.y)
+                + abs(position.z - playerPos.z))
     }
 }
