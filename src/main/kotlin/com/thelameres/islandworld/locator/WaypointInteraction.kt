@@ -118,7 +118,7 @@ object WaypointInteraction {
      */
     private fun resolveName(blockEntity: BlockEntity): Component? {
         if (blockEntity is SignBlockEntity) {
-            val lines: MutableList<Component> = blockEntity.getText(SignTextSlot.FRONT).getMessages(false)
+            val lines = blockEntity.getText(SignTextSlot.FRONT).getMessages(false)
             for (line in lines) {
                 val text = line.string.trim { it <= ' ' }
                 if (text.isNotEmpty()) {

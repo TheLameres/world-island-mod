@@ -4,6 +4,7 @@ import com.thelameres.islandworld.locator.BlockWaypointState;
 import com.thelameres.islandworld.locator.BlockWaypointTransmitter;
 import net.minecraft.world.level.block.entity.BannerBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
+import org.jspecify.annotations.NonNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
@@ -22,7 +23,7 @@ public abstract class MixinBlockEntityWaypoint implements BlockWaypointTransmitt
     private final BlockWaypointState islandworld$waypointState = new BlockWaypointState();
 
     @Override
-    public BlockWaypointState islandworld$waypointState() {
+    public @NonNull BlockWaypointState islandworld$waypointState() {
         return this.islandworld$waypointState;
     }
 }

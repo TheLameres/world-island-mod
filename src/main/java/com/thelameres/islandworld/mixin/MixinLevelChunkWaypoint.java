@@ -36,26 +36,5 @@ public abstract class MixinLevelChunkWaypoint {
         serverLevel.getWaypointManager().trackWaypoint(transmitter);
     }
 
-    @Inject(method = "removeBlockEntity", at = @At("HEAD"))
-    private void islandworld$untrackBlockWaypoint(BlockPos pos, CallbackInfo ci) {
-        LevelChunk self = (LevelChunk) (Object) this;
-        if (!(self.getLevel() instanceof ServerLevel serverLevel)) return;
 
-        BlockEntity blockEntity = self.getBlockEntity(pos);
-        if (!(blockEntity instanceof BlockWaypointTransmitter transmitter)) return;
-
-        serverLevel.getWaypointManager().untrackWaypoint(transmitter);
-    }
-
-    @Inject(method = "clearAllBlockEntities", at = @At("HEAD"))
-    private void islandworld$untrackAllBlockWaypoints(CallbackInfo ci) {
-        LevelChunk self = (LevelChunk) (Object) this;
-        if (!(self.getLevel() instanceof ServerLevel serverLevel)) return;
-
-        for (BlockEntity blockEntity : self.getBlockEntities().values()) {
-            if (blockEntity instanceof BlockWaypointTransmitter transmitter) {
-                serverLevel.getWaypointManager().untrackWaypoint(transmitter);
-            }
-        }
-    }
 }
