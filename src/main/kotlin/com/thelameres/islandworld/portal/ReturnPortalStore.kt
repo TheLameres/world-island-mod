@@ -1,10 +1,10 @@
 package com.thelameres.islandworld.portal
 
 import com.mojang.serialization.Codec
+import com.thelameres.islandworld.IslandWorldMod
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
-import net.minecraft.resources.Identifier
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.datafix.DataFixTypes
@@ -74,7 +74,7 @@ class ReturnPortalStore : SavedData() {
             CompoundTag.CODEC.xmap({ tag -> ofTag(tag) }, { store -> store.toTag() })
 
         private val TYPE: SavedDataType<ReturnPortalStore> = SavedDataType(
-            Identifier.fromNamespaceAndPath("islandworld", "return_portals"),
+            IslandWorldMod.id("return_portals"),
             Supplier { ReturnPortalStore() },
             CODEC,
             // DFU-тип нужен только для миграции; своя схема у нас стабильная,

@@ -1,10 +1,10 @@
 package com.thelameres.islandworld.locator
 
 import com.mojang.serialization.Codec
+import com.thelameres.islandworld.IslandWorldMod
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
-import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.datafix.DataFixTypes
 import net.minecraft.world.level.saveddata.SavedData
@@ -111,7 +111,7 @@ class WaypointStore : SavedData() {
             CompoundTag.CODEC.xmap({ tag -> ofTag(tag) }, { store -> store.toTag() })
 
         private val TYPE: SavedDataType<WaypointStore> = SavedDataType(
-            Identifier.fromNamespaceAndPath("islandworld", "waypoints"),
+            IslandWorldMod.id("waypoints"),
             Supplier { WaypointStore() },
             CODEC,
             // DFU-тип нужен только для миграции; своя схема у нас стабильная,
