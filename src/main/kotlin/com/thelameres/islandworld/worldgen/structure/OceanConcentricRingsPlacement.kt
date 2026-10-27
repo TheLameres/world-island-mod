@@ -13,8 +13,6 @@ import net.minecraft.core.registries.codec.RegistryCodecs
 import net.minecraft.world.level.biome.Biome
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState
 import net.minecraft.world.level.levelgen.structure.placement.AbstractSpreadingStructurePlacement
-import net.minecraft.world.level.levelgen.structure.placement.AbstractSpreadingStructurePlacement.ExclusionZone
-import net.minecraft.world.level.levelgen.structure.placement.AbstractSpreadingStructurePlacement.FrequencyReductionMethod
 import net.minecraft.world.level.levelgen.structure.placement.ConcentricRingsStructurePlacement
 import java.util.Optional
 import kotlin.math.sqrt

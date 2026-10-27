@@ -4,6 +4,7 @@ import com.thelameres.islandworld.border.BoundaryManager
 import com.thelameres.islandworld.border.BoundaryManager.onDisconnect
 import com.thelameres.islandworld.border.EdgeRespawn
 import com.thelameres.islandworld.border.IslandConfigLoader
+import com.thelameres.islandworld.locator.WaypointInteraction
 import com.thelameres.islandworld.util.FirstJoinStore
 import com.thelameres.islandworld.util.SpawnUtil
 import com.thelameres.islandworld.worldgen.density.ModDensityFunctions
@@ -29,6 +30,7 @@ object IslandWorldMod : ModInitializer {
         // LocatorBar: регистрация payload и периодическая отправка позиций игрокам с компасом
         com.thelameres.islandworld.locator.PlayerPositionsPayload.register()
         com.thelameres.islandworld.locator.CompassLocator.register()
+        WaypointInteraction.register()
 
         // Стронгхолды только в океане (план, раздел 3.1)
         com.thelameres.islandworld.worldgen.structure.OceanConcentricRingsPlacement.register()
