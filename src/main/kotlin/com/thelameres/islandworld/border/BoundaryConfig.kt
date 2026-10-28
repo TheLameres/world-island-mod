@@ -18,7 +18,15 @@ data class BoundaryConfig(
     @SerializedName("check_interval_ticks") val checkIntervalTicks: Int = 10,
     @SerializedName("reset_radius_margin") val resetRadiusMargin: Double = 100.0,
     @SerializedName("debug_messages") val debugMessages: Boolean = false,
-)
+    /**
+     * Серверный выключатель клиентских эффектов (шейдеры, тряска). Nullable намеренно:
+     * Gson не применяет значение по умолчанию к отсутствующим полям, и старый конфиг без ключа
+     * иначе молча отключал бы эффекты. Чтение — через [clientEffectsEnabled].
+     */
+    @SerializedName("client_effects") val clientEffects: Boolean? = null,
+) {
+    val clientEffectsEnabled: Boolean get() = clientEffects ?: true
+}
 
 /** Респавн после смерти от границы: случайный край острова. */
 data class RespawnConfig(
@@ -33,6 +41,12 @@ data class RespawnConfig(
 /** Стадия галлюцинаций: эффекты в формате "name:level", например "darkness:1". */
 data class StageConfig(
     val effects: List<String> = emptyList(),
+    /** Имя пост-эффекта из ассетов islandworld (`vignette_light`, `distortion_light`, `distortion_heavy`) или null. */
+    @SerializedName("post_effect") val postEffect: String? = null,
+    @SerializedName("screen_shake") val screenShake: Boolean = false,
+    @SerializedName("duration_ticks") val durationTicks: Int = 300,
+    /** Множитель силы клиентского эффекта 0.0..1.0. */
+    val intensity: Float = 0.5f,
 )
 
 data class IslandConfigFile(

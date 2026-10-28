@@ -21,8 +21,6 @@ import kotlin.random.Random
  *   которые обновляются каждые [REFRESH_TICKS] тиков.
  */
 object CompassCoordinatesHud : Registrable {
-    private val ELEMENT_ID: Identifier =
-        Identifier.fromNamespaceAndPath(IslandWorldMod.MOD_ID, "compass_coordinates")
 
     private const val REFRESH_TICKS = 5
     private const val RANDOM_XZ_RANGE = 30_000_000

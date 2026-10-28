@@ -2,6 +2,10 @@ package com.thelameres.islandworld.border
 
 import com.thelameres.islandworld.core.PlayerScoped
 import com.thelameres.islandworld.core.Registrable
+import com.thelameres.islandworld.hallucination.HallucinationMessage
+import com.thelameres.islandworld.hallucination.HallucinationPayload
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.minecraft.network.chat.Component
@@ -44,6 +48,11 @@ object BoundaryManager : Registrable, PlayerScoped {
             forget(newPlayer.uuid)
             EdgeRespawn.handleRespawn(newPlayer)
         }
+
+        // Смена измерения сбрасывает клиентский эффект: в Чёрной комнате и вне её он бессмыслен.
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register { player, _, _ ->
+            sendReset(player)
+        }
     }
 
     fun tick(server: MinecraftServer) {
@@ -57,8 +66,9 @@ object BoundaryManager : Registrable, PlayerScoped {
         val st = states.getOrPut(player.uuid) { PlayerBoundaryState() }
         val dist = hypot(player.x - cfg.centerX, player.z - cfg.centerZ)
 
-        // Возврат в безопасную зону сбрасывает счётчики
+        // Возврат в безопасную зону сбрасывает счётчики и клиентский эффект
         if (dist < cfg.warn1Radius - cfg.resetRadiusMargin) {
+            if (st.warningsIssued > 0) sendReset(player)
             st.warningsIssued = 0
             st.beyondKillTicks = 0
             return
@@ -75,6 +85,7 @@ object BoundaryManager : Registrable, PlayerScoped {
         if (dist >= cfg.killRadius && st.warningsIssued == 3 && !isProtected(player)) {
             st.beyondKillTicks += cfg.checkIntervalTicks
             if (st.beyondKillTicks >= cfg.killDelayTicks) {
+                sendReset(player)
                 UnknownDeath.kill(player)
                 states.remove(player.uuid)
             }
@@ -87,7 +98,32 @@ object BoundaryManager : Registrable, PlayerScoped {
         if (cfg.debugMessages) {
             player.sendOverlayMessage(Component.literal("[Boundary] стадия $stage"))
         }
-        config.hallucinations["stage$stage"]?.let { Hallucination.apply(player, it) }
+        config.hallucinations["stage$stage"]?.let {
+            Hallucination.apply(player, it)
+            sendStage(player, stage, it)
+        }
+    }
+
+    /**
+     * Отправляет клиенту готовый дескриптор стадии. Клиенты без мода пакет не получают:
+     * canSend проверяет, зарегистрирован ли канал у игрока.
+     */
+    private fun sendStage(player: ServerPlayer, stage: Int, stageCfg: StageConfig) {
+        if (!cfg.clientEffectsEnabled || !ServerPlayNetworking.canSend(player, HallucinationPayload.TYPE)) return
+        val message = HallucinationMessage(
+            stage = stage,
+            intensity = stageCfg.intensity,
+            postEffect = stageCfg.postEffect?.let { "islandworld:$it" },
+            screenShake = stageCfg.screenShake,
+            durationTicks = stageCfg.durationTicks,
+        )
+        ServerPlayNetworking.send(player, HallucinationPayload(message))
+    }
+
+    /** Явный сброс клиентского эффекта (stage = 0): возврат, смерть, смена измерения. */
+    private fun sendReset(player: ServerPlayer) {
+        if (!cfg.clientEffectsEnabled || !ServerPlayNetworking.canSend(player, HallucinationPayload.TYPE)) return
+        ServerPlayNetworking.send(player, HallucinationPayload(HallucinationMessage.reset()))
     }
 
     /** Творческий режим и наблюдатель не получают урон от границы. */

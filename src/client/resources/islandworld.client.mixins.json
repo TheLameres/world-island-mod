@@ -2,7 +2,9 @@
   "required": true,
   "package": "com.thelameres.islandworld.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": [],
+  "client": [
+    "CameraShakeMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },

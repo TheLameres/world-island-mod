@@ -1,6 +1,7 @@
 package com.thelameres.islandworld
 
 import com.thelameres.islandworld.border.BoundaryManager
+import com.thelameres.islandworld.hallucination.HallucinationPayload
 import com.thelameres.islandworld.core.Lifecycle
 import com.thelameres.islandworld.core.Registrable
 import com.thelameres.islandworld.locator.CompassLocator
@@ -53,6 +54,8 @@ object IslandWorldMod : ModInitializer {
     )
 
     override fun onInitialize() {
+        // Тип пакета регистрируется до подсистем: клиент и сервер должны знать кодек заранее.
+        HallucinationPayload.registerType()
         subsystems.forEach { it.register() }
 
         LOGGER.info("Island World initialised (worldgen stage 1, boundary 2000)")

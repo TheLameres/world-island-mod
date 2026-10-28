@@ -56,7 +56,7 @@ object EdgeRespawn : PlayerScoped, SessionScoped {
             spot.x + 0.5,
             spot.y.toDouble(),
             spot.z + 0.5,
-            emptySet<Relative>(),
+            emptySet(),
             0f,
             0f,
             false
