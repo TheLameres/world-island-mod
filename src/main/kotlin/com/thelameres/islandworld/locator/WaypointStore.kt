@@ -2,11 +2,11 @@ package com.thelameres.islandworld.locator
 
 import com.mojang.serialization.Codec
 import com.thelameres.islandworld.IslandWorldMod
-import com.thelameres.islandworld.core.Registrable
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+import com.thelameres.islandworld.core.RestoreScoped
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
+import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.datafix.DataFixTypes
 import net.minecraft.world.level.saveddata.SavedData
@@ -27,7 +27,7 @@ import java.util.*
  * и `upsert` перенёс бы существующую метку на новое место — исходная исчезла бы.
  * Позиция уникальна по определению, дубликат получить нельзя.
  *
- * Хранится в SavedData (data/islandworld_waypoints.dat), поэтому метки переживают
+ * Хранится в SavedData (data/islandworld/waypoints.dat), поэтому метки переживают
  * выгрузку чанка, перезагрузку мира и рестарт сервера.
  *
  * Жизненный цикл:
@@ -42,6 +42,14 @@ class WaypointStore : SavedData() {
 
     fun contains(pos: BlockPos): Boolean {
         return points.containsKey(pos)
+    }
+
+    /**
+     * Неизменяемый снимок всех точек для диагностики. Копия, поэтому её можно
+     * обходить без риска гонки с основным потоком и без влияния на хранилище.
+     */
+    fun snapshot(): List<StoredWaypoint> {
+        return points.values.toList()
     }
 
     fun get(pos: BlockPos): StoredWaypoint? {
@@ -107,7 +115,7 @@ class WaypointStore : SavedData() {
         return root
     }
 
-    companion object : Registrable {
+    companion object : RestoreScoped {
         private val CODEC: Codec<WaypointStore> =
             CompoundTag.CODEC.xmap({ tag -> ofTag(tag) }, { store -> store.toTag() })
 
@@ -149,22 +157,34 @@ class WaypointStore : SavedData() {
         }
 
         /**
-         * Возвращает сохранённые метки в WaypointManager после старта сервера.
-         * Хранилище живёт в SavedData, но менеджер создаётся заново и о точках не знает,
+         * Возвращает сохранённые метки в WaypointManager. Вызывается из [Lifecycle] на старте.
+         *
+         * Это не регистрация хранилища: реестра для SavedData в Minecraft нет, экземпляр
+         * создаётся по статическому [TYPE] через dataStorage. Восстанавливается
+         * transient-состояние: WaypointManager создаётся заново и о точках не знает,
          * пока чанки не загрузятся.
+         *
+         * Через get, а не computeIfAbsent: у уровней без меток (Незер, Энд, Чёрная комната)
+         * не должно появляться пустых экземпляров. computeIfAbsent помечает созданный объект
+         * грязным, и на диск ляжет пустой .dat.
          */
-        @JvmStatic
-        override fun register() {
-            ServerLifecycleEvents.SERVER_STARTED.register { server ->
-                for (level in server.allLevels) {
-                    of(level).attach(level)
-                }
+        override fun restore(server: MinecraftServer) {
+            for (level in server.allLevels) {
+                level.dataStorage.get(TYPE)?.attach(level)
             }
         }
 
         @JvmStatic
         fun of(level: ServerLevel): WaypointStore {
             return level.dataStorage.computeIfAbsent(TYPE)
+        }
+
+        /**
+         * Хранилище уровня или null, если меток там никогда не было. В отличие от [of]
+         * не создаёт экземпляр и не помечает его грязным, поэтому годится для диагностики.
+         */
+        fun find(level: ServerLevel): WaypointStore? {
+            return level.dataStorage.get(TYPE)
         }
     }
 }

@@ -1,12 +1,12 @@
 package com.thelameres.islandworld
 
 import com.thelameres.islandworld.border.BoundaryManager
+import com.thelameres.islandworld.command.DebugCommand
 import com.thelameres.islandworld.network.PayloadRegistry
 import com.thelameres.islandworld.core.Lifecycle
 import com.thelameres.islandworld.core.Registrable
 import com.thelameres.islandworld.locator.CompassLocator
 import com.thelameres.islandworld.locator.WaypointInteraction
-import com.thelameres.islandworld.locator.WaypointStore
 import com.thelameres.islandworld.player.FirstJoinSpawn
 import com.thelameres.islandworld.worldgen.blackroom.BlackRoomChunkGenerator
 import com.thelameres.islandworld.worldgen.blackroom.BlackRoomProtection
@@ -46,14 +46,16 @@ object IslandWorldMod : ModInitializer {
         BlackRoomWrapAround,
         BlackRoomProtection,
 
-        // LocatorBar и waypoint-метки
+        // LocatorBar и waypoint-метки (WaypointStore восстанавливается из Lifecycle)
         CompassLocator,
-        WaypointStore,
         WaypointInteraction,
 
         // Игровые подсистемы
         FirstJoinSpawn,
         BoundaryManager,
+
+        // Диагностика (только чтение, доступ для администраторов)
+        DebugCommand,
     )
 
     override fun onInitialize() {

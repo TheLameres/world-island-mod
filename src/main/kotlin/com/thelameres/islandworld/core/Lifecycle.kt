@@ -3,6 +3,7 @@ package com.thelameres.islandworld.core
 import com.thelameres.islandworld.border.BoundaryManager
 import com.thelameres.islandworld.border.EdgeRespawn
 import com.thelameres.islandworld.locator.CompassLocator
+import com.thelameres.islandworld.locator.WaypointStore
 import com.thelameres.islandworld.util.SpawnUtil
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
@@ -20,6 +21,9 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
  *
  * Регистрация обработчиков AFTER_RESPAWN и событий тика остаётся в самих подсистемах:
  * там важен порядок относительно соседей, и он должен читаться на месте.
+ *
+ * SERVER_STARTED тоже здесь: восстановление сохранённых меток — такая же общая операция
+ * над жизненным циклом, как сброс на остановке.
  */
 object Lifecycle : Registrable {
 
@@ -36,10 +40,18 @@ object Lifecycle : Registrable {
         EdgeRespawn,
     )
 
+    private val restoreScoped: List<RestoreScoped> = listOf(
+        WaypointStore,
+    )
+
     override fun register() {
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
             val uuid = handler.player.uuid
             playerScoped.forEach { it.forget(uuid) }
+        }
+
+        ServerLifecycleEvents.SERVER_STARTED.register { server ->
+            restoreScoped.forEach { it.restore(server) }
         }
 
         ServerLifecycleEvents.SERVER_STOPPED.register { _ ->

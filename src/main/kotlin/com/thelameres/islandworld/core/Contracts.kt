@@ -1,5 +1,6 @@
 package com.thelameres.islandworld.core
 
+import net.minecraft.server.MinecraftServer
 import java.util.*
 
 /**
@@ -42,4 +43,9 @@ interface PlayerScoped {
  */
 interface SessionScoped {
     fun reset()
+}
+
+
+interface RestoreScoped {
+    fun restore(server: MinecraftServer)
 }
