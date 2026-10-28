@@ -54,8 +54,8 @@ object Lifecycle : Registrable {
             restoreScoped.forEach { it.restore(server) }
         }
 
-        ServerLifecycleEvents.SERVER_STOPPED.register { _ ->
-            sessionScoped.forEach { it.reset() }
+        ServerLifecycleEvents.SERVER_STOPPED.register { server ->
+            sessionScoped.forEach { it.reset(server) }
         }
     }
 }

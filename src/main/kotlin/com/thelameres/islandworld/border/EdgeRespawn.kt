@@ -7,6 +7,7 @@ import com.thelameres.islandworld.util.isGround
 import com.thelameres.islandworld.util.isOceanAt
 import com.thelameres.islandworld.util.isPassable
 import net.minecraft.core.BlockPos
+import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Relative
@@ -64,7 +65,7 @@ object EdgeRespawn : PlayerScoped, SessionScoped {
         LOGGER.info("Игрок {} респавнен на краю острова: {}", player.name.string, spot)
     }
 
-    override fun reset() {
+    override fun reset(server: MinecraftServer) {
         pending.clear()
     }
 

@@ -4,5 +4,14 @@
   "islandworld.subtitle.unknown_death": "Unseen entity",
   "islandworld.waypoint.added": "Waypoint added: \"%s\" (%s, %s, %s)",
   "islandworld.waypoint.removed": "Waypoint removed: %s",
-  "islandworld.waypoint.default_name": "Waypoint %s %s %s"
+  "islandworld.waypoint.default_name": "Waypoint %s %s %s",
+  "islandworld.debug.waypoints.empty": "No WaypointStore points",
+  "islandworld.debug.waypoints.total": "WaypointStore: total points %s",
+  "islandworld.debug.waypoints.dimension": "%s — %s",
+  "islandworld.debug.waypoints.entry": "  %s @ %s %s %s: %s",
+  "islandworld.debug.waypoints.unnamed": "(unnamed)",
+  "islandworld.debug.locator.empty": "lastAttributeState is empty",
+  "islandworld.debug.locator.total": "lastAttributeState: entries %s",
+  "islandworld.debug.locator.entry": "  %s (%s): receive=%s transmit=%s",
+  "islandworld.debug.player.offline": "(offline)"
 }

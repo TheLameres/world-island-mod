@@ -157,7 +157,7 @@ class WaypointStore : SavedData() {
         }
 
         /**
-         * Возвращает сохранённые метки в WaypointManager. Вызывается из [Lifecycle] на старте.
+         * Возвращает сохранённые метки в WaypointManager. Вызывается из [com.thelameres.islandworld.core.Lifecycle] на старте.
          *
          * Это не регистрация хранилища: реестра для SavedData в Minecraft нет, экземпляр
          * создаётся по статическому [TYPE] через dataStorage. Восстанавливается

@@ -2,6 +2,7 @@ package com.thelameres.islandworld.util
 
 import com.thelameres.islandworld.core.SessionScoped
 import net.minecraft.core.BlockPos
+import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import org.slf4j.LoggerFactory
 import kotlin.math.sqrt
@@ -36,7 +37,7 @@ object SpawnUtil : SessionScoped {
     private var cachedSpawn: BlockPos? = null
 
     /** Сбрасывает кэш стартовой точки: вызывается на SERVER_STOPPED через Lifecycle. */
-    override fun reset() {
+    override fun reset(server: MinecraftServer) {
         cachedSpawn = null
     }
 
