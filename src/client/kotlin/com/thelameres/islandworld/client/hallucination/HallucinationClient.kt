@@ -1,6 +1,7 @@
 package com.thelameres.islandworld.client.hallucination
 
 import com.thelameres.islandworld.client.shake.CameraShake
+import com.thelameres.islandworld.core.Registrable
 import com.thelameres.islandworld.hallucination.HallucinationMessage
 import com.thelameres.islandworld.hallucination.HallucinationPayload
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
@@ -23,11 +24,11 @@ import org.slf4j.LoggerFactory
  *
  * Ползунок ванили options.screenEffectScale на 0 полностью отключает визуал: эффект не применяется.
  */
-object HallucinationClient {
+object HallucinationClient: Registrable {
     private val LOGGER = LoggerFactory.getLogger("islandworld/client/hallucination")
     private val controller = HallucinationController()
 
-    fun register() {
+    override fun register() {
         ClientPlayNetworking.registerGlobalReceiver(HallucinationPayload.TYPE) { payload, _ ->
             Minecraft.getInstance().execute { onMessage(payload.message) }
         }

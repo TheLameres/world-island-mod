@@ -1,17 +1,17 @@
 package com.thelameres.islandworld.hallucination
 
 import com.thelameres.islandworld.IslandWorldMod
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
-import net.minecraft.network.FriendlyByteBuf
+import io.netty.buffer.ByteBuf
+import net.minecraft.network.codec.ByteBufCodecs
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
 
 /**
- * Пакет сервер → клиент: готовый дескриптор стадии галлюцинаций (план 4.4, решение 3).
- * Клиент только исполняет дескриптор; конфиг и решения остаются на сервере.
+ * Пакет сервер -> клиент с дескриптором стадии (план 4.4).
  *
- * Тело — [HallucinationMessage.encode] одним byte-array: формат живёт в одном месте и тестируется без Minecraft.
+ * Сетевой кодек выведен из HallucinationMessage.CODEC через ByteBufCodecs.fromCodec,
+ * поэтому формат на проводе и в конфиге описан одним кодеком.
  */
 class HallucinationPayload(val message: HallucinationMessage) : CustomPacketPayload {
 
@@ -21,17 +21,14 @@ class HallucinationPayload(val message: HallucinationMessage) : CustomPacketPayl
         val ID: Identifier = IslandWorldMod.id("hallucination")
         val TYPE: CustomPacketPayload.Type<HallucinationPayload> = CustomPacketPayload.Type(ID)
 
-        /**
-         * Неверные байты превращаются в reset(), а не в исключение: пакет от сервера не должен ронять клиент.
-         */
-        val CODEC: StreamCodec<FriendlyByteBuf, HallucinationPayload> = StreamCodec.of(
-            { buf, payload -> buf.writeByteArray(payload.message.encode()) },
-            { buf -> HallucinationPayload(HallucinationMessage.decode(buf.readByteArray()) ?: HallucinationMessage.reset()) },
-        )
+        private val MESSAGE_STREAM: StreamCodec<ByteBuf, HallucinationMessage> =
+            ByteBufCodecs.fromCodec(HallucinationMessage.CODEC)
 
-        /** Регистрация типа на клиентской стороне; сервер регистрирует тот же тип для отправки. */
-        fun registerType() {
-            PayloadTypeRegistry.clientboundPlay().register(TYPE, CODEC)
-        }
+        /** Регистрируется через [com.thelameres.islandworld.network.PayloadRegistry], не самостоятельно. */
+        val CODEC: StreamCodec<ByteBuf, HallucinationPayload> = StreamCodec.composite(
+            MESSAGE_STREAM,
+            HallucinationPayload::message,
+            ::HallucinationPayload,
+        )
     }
 }
