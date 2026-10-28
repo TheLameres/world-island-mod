@@ -13,7 +13,8 @@ import net.minecraft.resources.Identifier
  * Сетевой кодек выведен из HallucinationMessage.CODEC через ByteBufCodecs.fromCodec,
  * поэтому формат на проводе и в конфиге описан одним кодеком.
  */
-class HallucinationPayload(val message: HallucinationMessage) : CustomPacketPayload {
+@JvmRecord
+data class HallucinationPayload(val message: HallucinationMessage) : CustomPacketPayload {
 
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 

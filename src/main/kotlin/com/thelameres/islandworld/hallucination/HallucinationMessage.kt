@@ -13,6 +13,7 @@ import java.util.Optional
  *
  * stage = 0 - явный сброс: сервер шлёт его при возврате в безопасную зону, смерти и смене измерения.
  */
+@JvmRecord
 data class HallucinationMessage(
     val stage: Int,
     val intensity: Float,
